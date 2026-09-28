@@ -1,0 +1,396 @@
+# Local multilingual industry catalog (ARCHITECTURE.md §3.2 "industries" row + catalog paragraph).
+# Seed data, curated and intentionally small (PLAN.md Q11) — not a full ISIC dump.
+#
+# `isic`: ISIC Rev.4 sections (letters) and divisions (2 digits) with their official English
+#         titles. Every section/division is resolvable by code or by title.
+# `profiles`: curated industry concepts mapping one or more ISIC codes to multilingual aliases
+#         (what clients type), local keywords (used to build discovery queries, e.g. the Overpass
+#         `name~"..."` filter, A§4), negative keywords and OSM tag hints.
+# `negative_keywords`: names containing one of these are excluded (Overpass `name!~` + local filter).
+# Every mapping records the classification scheme and version (A§3.2: ISIC Rev.5 is in progress).
+scheme: ISIC
+version: Rev.4
+
+isic:
+  sections:
+    A: Agriculture, forestry and fishing
+    B: Mining and quarrying
+    C: Manufacturing
+    D: Electricity, gas, steam and air conditioning supply
+    E: Water supply; sewerage, waste management and remediation activities
+    F: Construction
+    G: Wholesale and retail trade; repair of motor vehicles and motorcycles
+    H: Transportation and storage
+    I: Accommodation and food service activities
+    J: Information and communication
+    K: Financial and insurance activities
+    L: Real estate activities
+    M: Professional, scientific and technical activities
+    N: Administrative and support service activities
+    O: Public administration and defence; compulsory social security
+    P: Education
+    Q: Human health and social work activities
+    R: Arts, entertainment and recreation
+    S: Other service activities
+    T: Activities of households as employers; undifferentiated goods- and services-producing activities of households for own use
+    U: Activities of extraterritorial organizations and bodies
+  divisions:
+    "01": Crop and animal production, hunting and related service activities
+    "02": Forestry and logging
+    "03": Fishing and aquaculture
+    "05": Mining of coal and lignite
+    "06": Extraction of crude petroleum and natural gas
+    "07": Mining of metal ores
+    "08": Other mining and quarrying
+    "09": Mining support service activities
+    "10": Manufacture of food products
+    "11": Manufacture of beverages
+    "12": Manufacture of tobacco products
+    "13": Manufacture of textiles
+    "14": Manufacture of wearing apparel
+    "15": Manufacture of leather and related products
+    "16": Manufacture of wood and of products of wood and cork, except furniture; manufacture of articles of straw and plaiting materials
+    "17": Manufacture of paper and paper products
+    "18": Printing and reproduction of recorded media
+    "19": Manufacture of coke and refined petroleum products
+    "20": Manufacture of chemicals and chemical products
+    "21": Manufacture of basic pharmaceutical products and pharmaceutical preparations
+    "22": Manufacture of rubber and plastics products
+    "23": Manufacture of other non-metallic mineral products
+    "24": Manufacture of basic metals
+    "25": Manufacture of fabricated metal products, except machinery and equipment
+    "26": Manufacture of computer, electronic and optical products
+    "27": Manufacture of electrical equipment
+    "28": Manufacture of machinery and equipment n.e.c.
+    "29": Manufacture of motor vehicles, trailers and semi-trailers
+    "30": Manufacture of other transport equipment
+    "31": Manufacture of furniture
+    "32": Other manufacturing
+    "33": Repair and installation of machinery and equipment
+    "35": Electricity, gas, steam and air conditioning supply
+    "36": Water collection, treatment and supply
+    "37": Sewerage
+    "38": Waste collection, treatment and disposal activities; materials recovery
+    "39": Remediation activities and other waste management services
+    "41": Construction of buildings
+    "42": Civil engineering
+    "43": Specialized construction activities
+    "45": Wholesale and retail trade and repair of motor vehicles and motorcycles
+    "46": Wholesale trade, except of motor vehicles and motorcycles
+    "47": Retail trade, except of motor vehicles and motorcycles
+    "49": Land transport and transport via pipelines
+    "50": Water transport
+    "51": Air transport
+    "52": Warehousing and support activities for transportation
+    "53": Postal and courier activities
+    "55": Accommodation
+    "56": Food and beverage service activities
+    "58": Publishing activities
+    "59": Motion picture, video and television programme production, sound recording and music publishing activities
+    "60": Programming and broadcasting activities
+    "61": Telecommunications
+    "62": Computer programming, consultancy and related activities
+    "63": Information service activities
+    "64": Financial service activities, except insurance and pension funding
+    "65": Insurance, reinsurance and pension funding, except compulsory social security
+    "66": Activities auxiliary to financial service and insurance activities
+    "68": Real estate activities
+    "69": Legal and accounting activities
+    "70": Activities of head offices; management consultancy activities
+    "71": Architectural and engineering activities; technical testing and analysis
+    "72": Scientific research and development
+    "73": Advertising and market research
+    "74": Other professional, scientific and technical activities
+    "75": Veterinary activities
+    "77": Rental and leasing activities
+    "78": Employment activities
+    "79": Travel agency, tour operator, reservation service and related activities
+    "80": Security and investigation activities
+    "81": Services to buildings and landscape activities
+    "82": Office administrative, office support and other business support activities
+    "84": Public administration and defence; compulsory social security
+    "85": Education
+    "86": Human health activities
+    "87": Residential care activities
+    "88": Social work activities without accommodation
+    "90": Creative, arts and entertainment activities
+    "91": Libraries, archives, museums and other cultural activities
+    "92": Gambling and betting activities
+    "93": Sports activities and amusement and recreation activities
+    "94": Activities of membership organizations
+    "95": Repair of computers and personal and household goods
+    "96": Other personal service activities
+    "97": Activities of households as employers of domestic personnel
+    "98": Undifferentiated goods- and services-producing activities of private households for own use
+    "99": Activities of extraterritorial organizations and bodies
+
+profiles:
+  - id: manufacturing
+    isic: [C]
+    aliases:
+      de: [Produktion, Herstellung, Fertigung, Industrie, Verarbeitendes Gewerbe]
+      en: [manufacturing, production, manufacturer, manufacturers, factory]
+      fr: [industrie manufacturière, fabrication, production industrielle, industrie]
+      es: [fabricación, industria manufacturera]
+      it: [manifattura, produzione industriale]
+      nl: [productie, fabricage, maakindustrie]
+    keywords:
+      de: [fabrik, werk, produktion, fertigung, hersteller]
+      en: [manufacturing, factory, manufacturer, works]
+      fr: [usine, fabrication, fabricant, industrie]
+      es: [fábrica, fabricación, fabricante]
+      it: [fabbrica, manifattura, produzione]
+      nl: [fabriek, productie]
+    negative_keywords: [handwerk, werkstatt, feuerwerk, stadtwerk]
+    osm_tags: [[man_made, works], [industrial, factory]]
+
+  - id: machinery
+    isic: ["28"]
+    aliases:
+      de: [Maschinenbau, Maschinenfabrik, Anlagenbau, Maschinen- und Anlagenbau]
+      en: [machinery, machine building, machinery manufacturing, machine manufacturing]
+      fr: [construction mécanique, fabrication de machines]
+      es: [construcción de maquinaria, fabricación de maquinaria]
+      it: [costruzione di macchine, meccanica strumentale]
+      nl: [machinebouw]
+    keywords:
+      de: [maschinenbau, maschinenfabrik, anlagenbau, maschinen]
+      en: [machinery, machine, machines]
+      fr: [construction mécanique, machines, mécanique]
+      es: [maquinaria, máquinas]
+      it: [macchine, meccanica]
+      nl: [machinebouw, machines]
+    negative_keywords: [waschmaschine, kaffeemaschine]
+
+  - id: logistics
+    isic: ["49", "52", "53"]
+    aliases:
+      de: [Logistik, Spedition, Logistikdienstleister]
+      en: [logistics, freight forwarding, logistics services]
+      fr: [logistique]
+      es: [logística]
+      it: [logistica]
+      nl: [logistiek]
+    keywords:
+      de: [logistik, spedition, lager, transport]
+      en: [logistics, freight, forwarding, warehouse]
+      fr: [logistique, transport, entreposage, messagerie]
+      es: [logística, transporte, almacén]
+      it: [logistica, trasporti, spedizioni]
+      nl: [logistiek, transport, expeditie]
+    negative_keywords: [lagerverkauf, zeltlager, ferienlager, lagerfeuer, krankentransport]
+    osm_tags: [[office, logistics]]
+
+  - id: wholesale
+    isic: ["46"]
+    aliases:
+      de: [Großhandel, Großhändler]
+      en: [wholesale, wholesale trade, wholesaler, wholesalers]
+      fr: [commerce de gros, grossiste, vente en gros]
+      es: [comercio al por mayor, mayorista]
+      it: [commercio all'ingrosso, ingrosso]
+      nl: [groothandel]
+    keywords:
+      de: [großhandel, grosshandel, großhändler, großhandlung]
+      en: [wholesale, wholesaler, distributor]
+      fr: [grossiste, commerce de gros, négoce]
+      es: [mayorista, distribuidor]
+      it: [ingrosso, grossista]
+      nl: [groothandel]
+    osm_tags: [[shop, wholesale]]
+
+  - id: road_transport
+    isic: ["49"]
+    aliases:
+      de: [Straßengüterverkehr, Güterkraftverkehr, Transportunternehmen, Landverkehr]
+      en: [road transport, road freight, trucking, land transport, haulage]
+      fr: [transport routier, transport routier de marchandises, transporteur, transports routiers]
+      es: [transporte por carretera, transporte terrestre]
+      it: [autotrasporto, trasporto su strada]
+      nl: [wegtransport, wegvervoer]
+    keywords:
+      de: [transport, transporte, güterverkehr, spedition]
+      en: [trucking, haulage, transport, freight]
+      fr: [transport, transports, transporteur, routier]
+      es: [transporte, transportes]
+      it: [trasporti, autotrasporti]
+      nl: [transport, transportbedrijf]
+    negative_keywords: [krankentransport, patiententransport, taxi]
+
+  - id: warehousing
+    isic: ["52"]
+    aliases:
+      de: [Lagerei, Lagerhaltung, Lagerlogistik]
+      en: [warehousing, storage]
+      fr: [entreposage, stockage]
+      es: [almacenamiento]
+      it: [magazzinaggio]
+      nl: [opslag, warehousing]
+    keywords:
+      de: [lager, lagerei, lagerhaus]
+      en: [warehouse, storage, warehousing]
+      fr: [entrepôt, entreposage, stockage]
+    negative_keywords: [lagerverkauf, zeltlager, ferienlager]
+    osm_tags: [[industrial, warehouse]]
+
+  - id: courier
+    isic: ["53"]
+    aliases:
+      de: [Kurierdienst, Paketdienst, Postdienste]
+      en: [courier, postal services, parcel delivery, courier services]
+      fr: [messagerie, services postaux, coursier]
+      es: [mensajería]
+      it: [corriere, servizi postali]
+      nl: [koeriersdienst, pakketdienst]
+    keywords:
+      de: [kurier, paketdienst, express]
+      en: [courier, parcel, express]
+      fr: [messagerie, coursier, colis]
+
+  - id: retail
+    isic: ["47"]
+    aliases:
+      de: [Einzelhandel]
+      en: [retail, retail trade, retailer]
+      fr: [commerce de détail]
+      es: [comercio minorista]
+      it: [commercio al dettaglio]
+      nl: [detailhandel]
+    keywords:
+      de: [handel, geschäft, laden]
+      en: [store, shop, retail]
+      fr: [magasin, boutique]
+
+  - id: construction
+    isic: [F]
+    aliases:
+      de: [Bau, Baugewerbe, Bauunternehmen, Bauwirtschaft]
+      en: [construction, construction industry, building contractors]
+      fr: [bâtiment, btp, travaux publics]
+      es: [construcción]
+      it: [edilizia, costruzioni]
+      nl: [bouw, bouwbedrijf]
+    keywords:
+      de: [bau, bauunternehmen, hochbau, tiefbau]
+      en: [construction, builders, contractor]
+      fr: [construction, bâtiment, btp]
+      es: [construcciones, constructora]
+      it: [costruzioni, edilizia, edile]
+      nl: [bouw, aannemer]
+    osm_tags: [[office, construction_company], [craft, builder]]
+
+  - id: food_manufacturing
+    isic: ["10"]
+    aliases:
+      de: [Lebensmittelherstellung, Lebensmittelindustrie, Nahrungsmittelindustrie]
+      en: [food manufacturing, food production, food industry, food processing]
+      fr: [industrie agroalimentaire, agroalimentaire]
+      es: [industria alimentaria]
+      it: [industria alimentare]
+      nl: [voedingsmiddelenindustrie]
+    keywords:
+      de: [lebensmittel, nahrungsmittel, feinkost]
+      en: [food, foods]
+      fr: [agroalimentaire, alimentaire]
+
+  - id: it_services
+    isic: ["62"]
+    aliases:
+      de: [IT-Dienstleister, Softwareentwicklung, Software, IT-Dienstleistungen]
+      en: [software, it services, software development, it consulting]
+      fr: [informatique, développement logiciel, esn, services informatiques]
+      es: [desarrollo de software, servicios informáticos]
+      it: [sviluppo software, servizi informatici]
+      nl: [softwareontwikkeling, it-dienstverlening]
+    keywords:
+      de: [software, it, systemhaus]
+      en: [software, it services, technology]
+      fr: [informatique, logiciel]
+    osm_tags: [[office, it]]
+
+  - id: chemicals
+    isic: ["20"]
+    aliases:
+      de: [Chemie, chemische Industrie, Chemieindustrie]
+      en: [chemicals, chemical industry, chemical manufacturing]
+      fr: [chimie, industrie chimique]
+      es: [industria química]
+      it: [industria chimica]
+      nl: [chemische industrie]
+    keywords:
+      de: [chemie, chemische]
+      en: [chemical, chemicals]
+      fr: [chimie, chimique]
+
+  - id: automotive
+    isic: ["29"]
+    aliases:
+      de: [Automobilindustrie, Fahrzeugbau, Autozulieferer, Automobilzulieferer]
+      en: [automotive, automotive industry, automotive supplier]
+      fr: [industrie automobile, équipementier automobile]
+      es: [industria automotriz]
+      it: [industria automobilistica]
+      nl: [auto-industrie]
+    keywords:
+      de: [automotive, fahrzeugbau, fahrzeugtechnik]
+      en: [automotive]
+      fr: [automobile, équipementier]
+
+  - id: metal_products
+    isic: ["25"]
+    aliases:
+      de: [Metallbau, Metallverarbeitung, Metallwaren]
+      en: [metalworking, metal fabrication, fabricated metal products]
+      fr: [travail des métaux, chaudronnerie, métallerie]
+      es: [metalurgia de transformación]
+      it: [carpenteria metallica]
+      nl: [metaalbewerking]
+    keywords:
+      de: [metallbau, metall, stahlbau]
+      en: [metal, fabrication, steel]
+      fr: [métallerie, chaudronnerie, métal]
+    osm_tags: [[craft, metal_construction]]
+
+  - id: electrical_equipment
+    isic: ["27"]
+    aliases:
+      de: [Elektrotechnik, Elektroindustrie]
+      en: [electrical equipment, electrical engineering industry]
+      fr: [matériel électrique, construction électrique]
+      es: [material eléctrico]
+      it: [apparecchiature elettriche]
+      nl: [elektrotechniek]
+    keywords:
+      de: [elektrotechnik, elektro]
+      en: [electrical, electric]
+      fr: [électrique, électrotechnique]
+
+  - id: accommodation
+    isic: ["55"]
+    aliases:
+      de: [Hotellerie, Beherbergung, Hotels]
+      en: [accommodation, hotels, hotel]
+      fr: [hôtellerie, hébergement]
+      es: [hostelería, alojamiento]
+      it: [alberghi, alloggio]
+      nl: [hotelwezen, logies]
+    keywords:
+      de: [hotel, pension, gasthof]
+      en: [hotel, inn, lodge]
+      fr: [hôtel, auberge]
+    osm_tags: [[tourism, hotel]]
+
+  - id: food_service
+    isic: ["56"]
+    aliases:
+      de: [Gastronomie, Gastgewerbe, Restaurants]
+      en: [restaurants, food service, catering]
+      fr: [restauration]
+      es: [restauración, restaurantes]
+      it: [ristorazione]
+      nl: [horeca]
+    keywords:
+      de: [restaurant, gasthaus, catering]
+      en: [restaurant, catering]
+      fr: [restaurant, traiteur]
+    osm_tags: [[amenity, restaurant]]

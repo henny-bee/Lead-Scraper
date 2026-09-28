@@ -1,0 +1,3 @@
+{"status": "string", "job_id": "string", "count": "number",
+ "progress": {"target": "number", "candidates": "number", "crawled": "number", "with_email": "number"},
+ "resolved": "null"}

@@ -1,0 +1,28 @@
+# Email verification scoring (ARCHITECTURE.md §5.1: "Score 0–1 … the weights are kept in config so they
+# can be recalibrated with real bounce data"). score = base[reason] (or base[result] when the
+# reason has no own entry) + adjustments, clamped to 0..1.
+base_by_result:
+  deliverable: 0.95
+  risky: 0.45
+  unknown: 0.5
+  undeliverable: 0.02
+  suppressed: 0.0
+base_by_reason:
+  smtp_accepted: 0.95
+  catch_all: 0.5
+  disposable: 0.2
+  smtp_not_checked: 0.6        # MX present, mailbox not checked (best possible without SMTP, A§2.4)
+  smtp_disabled: 0.6
+  a_record_fallback: 0.4       # no MX, but the domain has A/AAAA (implicit MX)
+  greylisted: 0.5
+  smtp_blocked: 0.45
+  smtp_timeout: 0.45
+  dns_error: 0.3
+  invalid_syntax: 0.0
+  no_mx: 0.02
+  null_mx: 0.01
+  domain_not_found: 0.01
+  smtp_rejected: 0.02
+adjustments:
+  role_account: -0.02          # flag only (A§5.1: role accounts are fine for B2B)
+  free_provider: -0.05

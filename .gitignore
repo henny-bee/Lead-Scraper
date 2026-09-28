@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets (keep the template)
+.env
+.env.*
+!.env.example
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Optional GeoNames postal downloads (large third-party data; keep the folder)
+data/geonames/*
+!data/geonames/.gitkeep
+
+# Logs and local exports
+*.log
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,7 @@
+{"status": "string",
+ "resolved": {
+   "country": {"input": "string", "code": "string", "languages": ["string"], "tier": "string"},
+   "regions": [{"input": "string", "id": "string", "name": "string", "level": "string", "method": "string"}],
+   "industries": [{"input": "string", "isic": ["string"], "scheme": "string", "version": "string",
+                   "keywords": {"en": ["string"]}, "method": "string"}],
+   "sources": ["string"], "known_in_job": "number", "compliance_note": "string", "warnings": ["string"]}}

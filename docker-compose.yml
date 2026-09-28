@@ -1,0 +1,12 @@
+# docker-compose.yml — ARCHITECTURE.md §10.1 (zero-config default: one service, no DB/Redis).
+services:
+  lead-scraper:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false          # PLAN Q14: plain `docker compose up -d` works without .env
+    ports:
+      - "8000:8000"
+    tmpfs:
+      - /tmp/leadscraper

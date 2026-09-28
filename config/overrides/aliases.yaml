@@ -1,0 +1,23 @@
+# Curated aliases (ARCHITECTURE.md §3.2). Keys are normalised with norm() when loaded
+# (lowercase, no accents, hyphens -> spaces), so "North Rhine-Westphalia" and "north-rhine-westphalia" are the same key.
+# Values: ISO 3166-1 alpha-2 (countries) / ISO 3166-2 codes (regions, grouped by country).
+# Aliases are only consulted after the exact ISO/CLDR lookup, never instead of it.
+
+countries:
+  uk: GB
+  great britain: GB
+
+regions:
+  DE:
+    nrw: DE-NW
+    bavaria: DE-BY
+    lower saxony: DE-NI
+    north rhine westphalia: DE-NW
+    rlp: DE-RP
+    bawu: DE-BW
+  FR:
+    idf: FR-IDF
+    paca: FR-PAC
+
+# Industry aliases are part of the industry catalog (data/isic/industries.yaml, T09).
+industries: {}

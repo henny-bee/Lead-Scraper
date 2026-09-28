@@ -1,0 +1,45 @@
+# Resolver golden cases (ARCHITECTURE.md §3.2 behaviour table, §11 "Resolver").
+# expect: resolved code, or null for a 422. first_suggestion / suggestions describe the 422 details.
+# aliases: false -> resolve without curated aliases (to prove the 422 path of the A§3.2 table).
+countries:
+  - {input: Alemania, expect: DE}
+  - {input: Deutschland, expect: DE}
+  - {input: DEU, expect: DE}
+  - {input: Deutschalnd, expect: DE, method: fuzzy}      # typo
+  - {input: Germany, expect: DE, method: exact}
+  - {input: DE, expect: DE, method: exact}
+  - {input: Austira, expect: AT, method: fuzzy}          # typo
+  - {input: Espana, expect: ES}
+  - {input: Niederlande, expect: NL}
+  - {input: Schweiz, expect: CH}
+  - {input: France, expect: FR}
+  - {input: Allemagne, expect: DE}
+  - {input: Great Britain, expect: null, first_suggestion: GB, aliases: false}
+  - {input: Great Britain, expect: GB, method: alias}
+  - {input: Qwertzuiop, expect: null, suggestions: []}
+  # England: no curated alias (removed, C13 — England is GB-ENG). The unchanged A§3.2 code still
+  # resolves it as an *exact* CLDR territory name: Babel locales `wae`/`wae_CH` (Walser) name GB
+  # "England". Recorded as-is, no special handling (Supervisor T07 review 2026-09-24).
+  - {input: England, expect: GB, method: exact}
+  - {input: England, expect: GB, method: exact, aliases: false}
+regions:
+  - {country: DE, input: Bayern, expect: DE-BY, method: exact}
+  - {country: DE, input: BY, expect: DE-BY, method: exact}
+  - {country: DE, input: DE-BY, expect: DE-BY, method: exact}
+  - {country: DE, input: Nordrhein Westfalen, expect: DE-NW, method: exact}
+  - {country: DE, input: Nordrhein-Westfalen, expect: DE-NW, method: exact}
+  - {country: DE, input: Nieder-Sachsen, expect: DE-NI, method: fuzzy}
+  - {country: DE, input: Hesse, expect: DE-HE, method: fuzzy}
+  - {country: DE, input: Hessen, expect: DE-HE, method: exact}
+  - {country: DE, input: NRW, expect: DE-NW, method: alias}
+  - {country: DE, input: NRW, expect: null, aliases: false}
+  - {country: DE, input: Bavaria, expect: DE-BY, method: alias}
+  - {country: FR, input: paca, expect: FR-PAC, method: alias}
+  - {country: GB, input: England, expect: GB-ENG, method: exact}
+  - {country: FR, input: Ain, expect: FR-01, method: exact}
+  - {country: FR, input: Ile de France, expect: FR-IDF, method: exact}
+  - {country: FR, input: Île-de-France, expect: FR-IDF, method: exact}
+  - {country: FR, input: Auvergne-Rhône-Alpes, expect: FR-ARA, method: exact}
+  - {country: FR, input: Paris, expect: FR-75C, method: exact}
+  - {country: DE, input: Bayerm, expect: null, suggestions: [DE-BY]}
+  - {country: DE, input: Nord, expect: null, suggestions: []}

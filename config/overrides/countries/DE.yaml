@@ -1,0 +1,3 @@
+# CountryProfile overrides for DE (ARCHITECTURE.md §3.2). Any CountryProfile field set here wins.
+# Extra keys (e.g. compliance_note) are kept in CountryProfile.overrides.
+compliance_note: "DE: DSGVO/GDPR and § 7 UWG apply; advertising email generally requires the recipient's consent. Check outreach rules before using the data for marketing."

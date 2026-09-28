@@ -1,0 +1,19 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API (fixture)",
+  "osm3s": {"timestamp_osm_base": "2026-09-20T00:00:00Z"},
+  "elements": [
+    {"type": "node", "id": 1001, "lat": 51.2277, "lon": 6.7735,
+     "tags": {"name": "Muster Maschinenbau GmbH", "website": "https://muster-maschinenbau-example.de", "email": "info@muster-maschinenbau-example.de",
+              "addr:postcode": "40210", "addr:city": "Düsseldorf", "man_made": "works"}},
+    {"type": "way", "id": 2002, "center": {"lat": 51.4556, "lon": 7.0116},
+     "tags": {"name": "Textilfabrik Beispiel KG", "contact:website": "beispiel-textil-example.de",
+              "contact:email": "kontakt@beispiel-textil-example.de", "contact:phone": "+49 201 123456"}},
+    {"type": "relation", "id": 3003, "center": {"lat": 51.5, "lon": 7.4},
+     "tags": {"name": "Metallbau Vorlage GmbH", "industrial": "factory"}},
+    {"type": "node", "id": 1001, "lat": 51.2277, "lon": 6.7735,
+     "tags": {"name": "Muster Maschinenbau GmbH", "website": "https://muster-maschinenbau-example.de"}},
+    {"type": "way", "id": 2003, "center": {"lat": 51.3, "lon": 6.9}, "tags": {"man_made": "works"}},
+    {"type": "node", "id": 1004, "lat": 51.35, "lon": 6.95, "tags": {"name": "Kfz Werkstatt Motor"}}
+  ]
+}

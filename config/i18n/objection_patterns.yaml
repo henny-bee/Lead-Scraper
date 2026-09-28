@@ -1,0 +1,28 @@
+# Marketing-objection phrases per language (ARCHITECTURE.md §3.6 "Advertising objection"): explicit
+# statements on a legal/contact page objecting to unsolicited advertising e-mail. A match sets
+# `marketing_objection=True`; with `exclude_marketing_objections=true` (default) the company is
+# dropped from the result (A§2.1).
+# Regular expressions (Python `re`), matched case-insensitively against the page text with
+# whitespace collapsed. Keep them specific — a false positive silently removes a company.
+de:
+  - "nicht ausdr(ü|ue)cklich angeforderte[rn]? werbung"
+  - "widersprechen\\b.{0,160}\\b(werbung|werbe\\w*|werbemails?)"
+  - "(werbung|werbe\\w*).{0,200}\\bwird hiermit (ausdr(ü|ue)cklich )?widersprochen"
+  - "unerw(ü|ue)nschte werbe(e-?mails?|sendungen|informationen)"
+en:
+  - "unsolicited (advertising|marketing|commercial|promotional) (e-?mails?|messages?|material|information)"
+  - "(we|i) (hereby )?(object|objects) to the use of .{0,80}contact (data|details|information).{0,80}(advertising|marketing)"
+fr:
+  - "(prospection|d(é|e)marchage) (commerciale?|publicitaire).{0,80}(interdit|refus|oppos)"
+  - "nous (nous )?opposons .{0,120}(prospection|publicit(é|e)|d(é|e)marchage)"
+  - "(publicit(é|e)s?|messages?) non sollicit(é|e)(e|s|es)?"
+es:
+  - "publicidad no solicitada"
+  - "nos oponemos .{0,120}(publicidad|comunicaciones comerciales)"
+it:
+  - "pubblicit(à|a) non richiesta"
+  - "comunicazioni commerciali non (richieste|sollecitate)"
+nl:
+  - "ongevraagde (reclame|commerci(ë|e)le (e-?mails?|berichten))"
+pt:
+  - "publicidade n(ã|a)o solicitada"

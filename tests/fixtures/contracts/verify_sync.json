@@ -1,0 +1,6 @@
+{"status": "string", "count": "number",
+ "results": [{"email": "string", "result": "string", "reason": "string", "score": "number",
+              "verification_level": "string",
+              "checks": {"syntax_valid": "bool", "domain_has_mx": "bool", "mx_hosts": ["string"],
+                         "is_disposable": "bool", "is_role_account": "bool", "is_free_provider": "bool"},
+              "cached": "bool", "checked_at": "string"}]}

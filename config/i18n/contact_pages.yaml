@@ -1,0 +1,23 @@
+# Contact / legal-notice page keywords per language (ARCHITECTURE.md §3.6).
+# `keywords.<lang>`: matched (case-insensitive) against link text or URL on the homepage.
+#   CountryProfile.contact_keywords = official languages of the country (CLDR) + English.
+#   Order matters: legal-notice words first (legal-notice-first, A§1 #6), then contact words.
+# `fallback_paths`: common paths tried in order when no matching link is found (A§3.6).
+keywords:
+  de: [impressum, kontakt, anbieterkennzeichnung, "über uns", ueber-uns]
+  en: [imprint, legal notice, contact, contact us, about us]
+  fr: [mentions légales, mentions-legales, mentions legales, contact, contactez-nous, "à propos"]
+  es: [aviso legal, aviso-legal, contacto, contactar, "quiénes somos"]
+  it: [note legali, note-legali, contatti, contattaci, chi siamo]
+  nl: [colofon, disclaimer, contact, over ons]
+  pt: [aviso legal, termos legais, contacto, contato, fale conosco, sobre nós]
+# `legal_markers`: a page reached via one of these words (link text/URL or fallback path) is treated
+#   as the legal-notice page (A§3.7: +10 for emails found there; A§1 #6 legal-notice-first).
+legal_markers: [impressum, imprint, legal notice, anbieterkennzeichnung, mentions légales,
+                mentions-legales, mentions legales, aviso legal, aviso-legal, note legali, note-legali,
+                colofon, termos legais]
+fallback_paths:
+  - /impressum
+  - /mentions-legales
+  - /aviso-legal
+  - /contact

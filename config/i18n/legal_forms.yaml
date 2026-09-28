@@ -1,0 +1,39 @@
+DE:
+  suffix: [GmbH & Co. KGaA, GmbH & Co. KG, AG & Co. KG, UG (haftungsbeschränkt), gGmbH, GmbH, KGaA,
+           AG, KG, OHG, UG, e.K., e.Kfm., eG, e.V., GbR, PartG, SE]
+  register: de.handelsregisternummer
+  register_pattern: '\b(HRA|HRB|GnR|PR|VR)\s?(\d{1,6}(?:\s?[A-Z]{1,2})?)\b'
+AT:
+  suffix: [GmbH & Co KG, GmbH, AG, KG, OG, e.U.]
+CH:
+  suffix: [GmbH, AG, SA, Sàrl, Sagl]
+FR:
+  suffix: [SASU, SAS, SARL, EURL, SNC, SCOP, SCI, SA]
+  register: fr.siren
+  register_pattern: '(?:RCS|R\.C\.S\.|SIREN|Siren)\s*:?\s*(?:[A-Za-zÀ-ÿ\-]+\s+)?(\d{3}\s?\d{3}\s?\d{3})\b'
+BE:
+  suffix: [SRL, SPRL, BVBA, BV, NV, SA]
+GB:
+  suffix: [Limited, Ltd., Ltd, PLC, plc, LLP]
+IE:
+  suffix: [Limited, Ltd, DAC, CLG, PLC]
+NL:
+  suffix: [B.V., N.V., V.O.F., BV, NV, VOF]
+ES:
+  suffix: [S.L.U., S.L., S.A., SLU, SL, SA, S.Coop.]
+IT:
+  suffix: [S.r.l.s., S.r.l., S.p.A., S.a.s., S.n.c., Srl, SpA]
+PT:
+  suffix: [Unipessoal Lda, Lda., Lda, S.A.]
+NO:
+  suffix: [ASA, AS, ANS, DA]
+  register: no.orgnr
+  register_pattern: '(?:Org\.?\s?nr\.?|Organisasjonsnummer|Foretaksregisteret)\s*:?\s*(\d{3}\s?\d{3}\s?\d{3})\b'
+SE:
+  suffix: [AB, HB, KB]
+DK:
+  suffix: [ApS, A/S, I/S]
+PL:
+  suffix: [sp. z o.o., S.A., sp.k.]
+US:
+  suffix: [Corporation, Inc., Inc, Corp., LLC, LLP, LP, Ltd.]

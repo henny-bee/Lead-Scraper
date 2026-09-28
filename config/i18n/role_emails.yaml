@@ -1,0 +1,40 @@
+# Best-email scoring (ARCHITECTURE.md §3.7). All weights live here, not in code.
+weights:
+  same_domain: 50            # email domain == registered domain of the website
+  generic_max: 30            # first generic local part of the country's languages ...
+  generic_min: 20            # ... down to the last one (order below decides the score)
+  legal_or_jsonld: 10        # found on the legal-notice page or in JSON-LD Organization
+  person_like: -10           # firstname.lastname (personal data, data minimisation)
+  free_mail: -20             # free-mail provider (default; per-country override below)
+  special_function: -40      # privacy/jobs/press/noreply/webmaster …
+
+# Some markets use free mail as the main business address (A§3.7) → smaller penalty.
+free_mail_weight_by_country:
+  BR: -10
+  IN: -10
+  TR: -10
+
+# Generic role local parts per language, most preferred first. For a country the lists of its
+# official languages are used first, then English; duplicates keep their first position.
+generic:
+  de: [info, kontakt, office, vertrieb, verkauf, service, zentrale, anfrage, mail, post, buero]
+  en: [info, contact, office, sales, hello, enquiries, inquiries, mail, service, admin]
+  fr: [info, contact, bonjour, accueil, commercial, ventes, service, secretariat]
+  es: [info, contacto, hola, oficina, ventas, comercial, administracion]
+  it: [info, contatti, contatto, ufficio, vendite, commerciale, amministrazione]
+  nl: [info, contact, kantoor, verkoop, sales, service]
+  pt: [info, contato, contacto, geral, vendas, comercial]
+
+# Special-function addresses (multilingual) — matched as the local part or its first word.
+special_function: [datenschutz, privacy, dpo, rgpd, gdpr, dsgvo, datenschutzbeauftragter,
+                   jobs, job, karriere, careers, career, bewerbung, recrutement, hr,
+                   presse, press, media, noreply, no-reply, donotreply, do-not-reply,
+                   webmaster, hostmaster, postmaster, abuse, newsletter, unsubscribe]
+
+# Used only until the vendored free-mail list (verification/data/free_email_domains.txt, T18/Q17)
+# is present.
+free_mail_fallback: [gmail.com, googlemail.com, yahoo.com, yahoo.de, yahoo.fr,
+                     hotmail.com, hotmail.de, hotmail.fr, outlook.com, outlook.de, live.com,
+                     icloud.com, me.com, aol.com, gmx.de, gmx.net, gmx.at, gmx.ch, web.de,
+                     t-online.de, freenet.de, orange.fr, wanadoo.fr, free.fr, laposte.net,
+                     mail.ru, yandex.ru, proton.me, protonmail.com]
