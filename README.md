@@ -1,4 +1,4 @@
-# Company Lead Scraper API (v0.3, zero-config)
+# Company Lead Scraper API 
 
 Send it a target (country, regions, industries, fields you want, max results). It returns
 companies with their website and email. The country, region and industry values are free text in
