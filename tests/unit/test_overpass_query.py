@@ -8,6 +8,7 @@ from leadscraper.services.resolver.industry import default_catalog
 from leadscraper.sources.osm_overpass import (
     area_selector,
     build_query,
+    candidate_tier,
     element_to_candidate,
     is_excluded,
     keyword_pattern,
@@ -44,7 +45,7 @@ def test_a4_example_semantics_with_catalog_profile() -> None:
     q = build_query(NRW, profile, ("de",))
     assert q.startswith("[out:json][timeout:180];")
     assert 'area["ISO3166-2"="DE-NW"]->.region;' in q
-    assert 'nwr(area.region)["name"]->.named;' in q              # named-set form (T25)
+    assert 'nwr(area.region)["name"]->.named;' in q              # named-set form
     name_line = next(line for line in q.splitlines() if '"name"~' in line)
     for kw in ("fabrik", "produktion", "fertigung", "hersteller"):
         assert kw in name_line
@@ -106,6 +107,16 @@ def test_profile_without_keywords_only_tag_clauses() -> None:
     assert 'nwr["shop"="wholesale"]["name"](area.region);' in legacy
 
 
+def test_any_industry_profile_selects_company_keys() -> None:
+    """No industries in the request → key-exists clauses for office/craft/industrial + works."""
+    from leadscraper.services.resolver.resolve import ANY_INDUSTRY
+    q = build_query(NRW, ANY_INDUSTRY, ("de",))
+    assert '"name"~' not in q
+    for clause in ('nwr.named["office"];', 'nwr.named["craft"];', 'nwr.named["industrial"];',
+                   'nwr.named["man_made"="works"];'):
+        assert clause in q
+
+
 def test_element_mapping() -> None:
     node = element_to_candidate({"type": "node", "id": 5, "lat": 1.5, "lon": 2.5, "tags": {
         "name": " Firma GmbH ", "contact:website": "firma-example.de", "contact:email": "info@firma-example.de",
@@ -136,7 +147,7 @@ def test_no_api_key_read_in_sources() -> None:
 
 
 def test_named_set_form_is_equivalent_to_a4_shape() -> None:
-    """T25 live diagnosis: same filters, but the regex runs on the area's named elements only."""
+    """Live diagnosis: same filters, but the regex runs on the area's named elements only."""
     profile = default_catalog().resolve("Logistik", ("de",)).profile
     bremen = geo.resolve_region_detailed("DE", "Bremen").area
     q = build_query(bremen, profile, ("de",), limit=50)
@@ -158,3 +169,13 @@ def test_client_timeout_exceeds_server_timeout() -> None:
 
     assert C.OVERPASS_HTTP_TIMEOUT_S > C.OVERPASS_QUERY_TIMEOUT_S
     assert C.OVERPASS_HTTP_TIMEOUT_S - C.OVERPASS_QUERY_TIMEOUT_S >= 30
+
+
+def test_candidate_tier() -> None:
+    """0 = has a website, 1 = has only an email, 2 = neither (blank values do not count)."""
+    assert candidate_tier({"website": "https://a-example.de"}) == 0
+    assert candidate_tier({"contact:website": "a-example.de", "email": "x@a-example.de"}) == 0
+    assert candidate_tier({"email": "info@a-example.de"}) == 1
+    assert candidate_tier({"contact:email": "info@a-example.de", "website": "  "}) == 1
+    assert candidate_tier({"name": "Ohne"}) == 2
+    assert candidate_tier({}) == 2
