@@ -56,7 +56,7 @@ def test_regions_bounds(n: int, ok: bool) -> None:
             make(regions=regions)
 
 
-@pytest.mark.parametrize("n,ok", [(0, False), (1, True), (20, True), (21, False)])
+@pytest.mark.parametrize("n,ok", [(0, True), (1, True), (20, True), (21, False)])
 def test_industries_bounds(n: int, ok: bool) -> None:
     industries = [f"I{i}" for i in range(n)]
     if ok:
@@ -91,9 +91,12 @@ def test_strip_and_case_insensitive_dedupe() -> None:
     assert r.industries == ["Logistik", "Großhandel"]
 
 
-def test_industries_blank_only_rejected() -> None:
-    with pytest.raises(ValidationError):
-        make(industries=["  ", ""])
+def test_industries_optional() -> None:
+    """Omitted, empty or blank-only industries = all companies in the area."""
+    body = {k: v for k, v in BASE.items() if k != "industries"}
+    assert ScrapeRequest(**body).industries == []
+    assert make(industries=[]).industries == []
+    assert make(industries=["  ", ""]).industries == []
 
 
 def test_country_length() -> None:
