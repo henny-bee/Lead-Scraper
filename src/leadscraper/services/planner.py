@@ -1,13 +1,4 @@
-"""Planner (ARCHITECTURE.md §3.4 "Plan", §3.5): slices area × industry → quota per slice.
-
-- One :class:`SearchSlice` per (resolved region, resolved industry); the client's labels are kept
-  for the response echo (A§2.3). Two inputs that resolve to the same (area, profile) share one
-  slice (the first label wins).
-- Discovery target = ``max_output`` × over-fetch factor (1.5–2×, per tier from ``constants``).
-- Quotas via ``domain.quota.allocate`` (water-filling). When a slice runs dry at runtime its
-  capacity is locked to what it produced and the remaining target is re-allocated (A§3.5).
-- Overlap ranking helpers for dedup: most specific ISIC wins; smaller area wins (A§3.5).
-"""
+"""Planner: slices area × industry → quota per slice."""
 
 from __future__ import annotations
 
@@ -38,8 +29,8 @@ def industry_specificity(profile: IndustryProfile) -> tuple[int, int]:
 
 
 def area_specificity(area: GeoArea) -> int:
-    """Higher = smaller area: country 0, ISO subdivision 1 + number of ISO ancestors,
-    Nominatim/OSM relation (city/district level, Q7) 3."""
+    """Higher = smaller area: country 0, ISO subdivision 1 + number of ISO ancestors, Nominatim/OSM
+    relation 3."""
     if area.level == "country":
         return 0
     if area.osm_relation_id is not None or not area.code:
@@ -83,7 +74,7 @@ class Plan:
         self.slices[key].produced += n
 
     def mark_exhausted(self, key: str) -> dict[str, int]:
-        """Lock the slice at what it produced and re-allocate the remaining target (A§3.5)."""
+        """Lock the slice at what it produced and re-allocate the remaining target."""
         sp = self.slices[key]
         sp.exhausted = True
         sp.capacity = sp.produced
@@ -103,23 +94,37 @@ class Plan:
                 if not p.exhausted and p.slice.quota > p.produced]
 
 
+def country_split(area: GeoArea) -> list[GeoArea]:
+    """The first-level subdivisions of a country-level area; ``[]`` = keep the single country slice
+    (none, or > the cap)."""
+    if area.level != "country":
+        return []
+    subs = [s for s in pycountry.subdivisions.get(country_code=area.country_code) or ()
+            if not getattr(s, "parent_code", None) and s.code not in C.COUNTRY_SPLIT_EXCLUDED_CODES]
+    if not 1 <= len(subs) <= C.COUNTRY_SPLIT_MAX_SUBDIVISIONS:
+        return []
+    return [GeoArea(id=f"iso:{s.code}", country_code=area.country_code, name=s.name, level=s.type,
+                    code=s.code, input="", method="country") for s in sorted(subs, key=lambda s: s.code)]
+
+
 def build_plan(resolved: ResolvedRequest) -> Plan:
     req = resolved.request
     target = overfetch_target(req.max_output, resolved.profile.tier)
     plan = Plan(country_code=resolved.country_code, target=target)
     order = 0
-    for area in resolved.regions:
-        plan.areas[area.id] = area
-        for industry in resolved.industries:
-            plan.industries.setdefault(industry.id, industry)
-            s = SearchSlice(country_code=resolved.country_code, area_id=area.id,
-                            industry_profile_id=industry.id,
-                            region_label=area.input,          # "" when regions is empty (whole country)
-                            industry_label=industry.input, quota=0)
-            key = slice_key(s)
-            if key in plan.slices:                    # e.g. "Logistik" + "Spedition" → same profile
-                continue
-            plan.slices[key] = SlicePlan(slice=s, order=order, capacity=target)
-            order += 1
+    for requested in resolved.regions:
+        for area in country_split(requested) or [requested]:
+            plan.areas[area.id] = area
+            for industry in resolved.industries:
+                plan.industries.setdefault(industry.id, industry)
+                s = SearchSlice(country_code=resolved.country_code, area_id=area.id,
+                                industry_profile_id=industry.id,
+                                region_label=requested.input,   # "" when regions is empty (whole country)
+                                industry_label=industry.input, quota=0)
+                key = slice_key(s)
+                if key in plan.slices:                # e.g. "Logistik" + "Spedition" → same profile
+                    continue
+                plan.slices[key] = SlicePlan(slice=s, order=order, capacity=target)
+                order += 1
     plan.rebalance()
     return plan
