@@ -55,11 +55,12 @@ All variables are optional. An empty value means "use the default". No other var
 | `NOMINATIM_MAX_RPS` | `1` | Request rate to Nominatim (the public instance allows at most 1/s) |
 | `INDUSTRY_EMBEDDINGS_ENABLED` | `false` | Reserved; not implemented in v0.3 |
 | `INDUSTRY_LLM_ENABLED` | `false` | Reserved; not implemented in v0.3 |
-| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | Overpass endpoint (public or self-hosted) |
+| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | Overpass endpoint (public or self-hosted). Only the public default fails over to the two mirrors `overpass.kumi.systems` and `overpass.private.coffee`; a self-hosted URL never sends queries elsewhere. |
+| `WEB_SEARCH_URL` | `https://html.duckduckgo.com/html/` | Web search for website lookups and company discovery. **`off`** (case-insensitive) switches all web search off. An empty value means the default. Any other http(s) URL is a SearXNG-compatible JSON API (see §3.1). Google and Bing URLs are rejected at startup. |
 | `GOOGLE_PLACES_API_KEY` / `GOOGLE_PLACES_ENABLED` | *(empty)* / `false` | Reserved for a later optional adapter; no effect in v0.3 |
 | `COMPANIES_HOUSE_API_KEY` / `COMPANIES_HOUSE_ENABLED` | *(empty)* / `false` | Reserved for a later optional adapter; no effect in v0.3 |
 | `CRAWLER_USER_AGENT` | `LeadScraperBot/0.3 (+https://your-domain.de/bot)` | Used for crawling, Overpass and callbacks. **Set it to a URL describing your bot.** |
-| `CRAWLER_GLOBAL_CONCURRENCY` | `16` | Concurrent website fetches per job |
+| `CRAWLER_GLOBAL_CONCURRENCY` | `16` | Connections in flight per job. Companies in flight are 4 × this value (64). |
 | `CRAWLER_PER_DOMAIN_DELAY_S` | `2` | Pause between requests to the same domain |
 | `CRAWLER_MAX_PAGES_PER_DOMAIN` | `5` | Pages fetched per company website (robots.txt excluded) |
 | `CRAWLER_MAX_RESPONSE_MB` | `2` | Larger responses are aborted |
@@ -70,7 +71,50 @@ All variables are optional. An empty value means "use the default". No other var
 
 Some limits are code constants in `src/leadscraper/constants.py`, not env vars. They include the
 Overpass pacing, the per-IP rate limit, the 120-minute maximum job runtime, the 10 s callback
-timeout, and the `/verify` limits of 50 and 10 000. Changing them means changing code.
+timeout, and the `/verify` limits of 50 and 10 000. Changing them means changing code. The
+constants added in v0.4 that change behaviour:
+
+| Constant | Value | Effect |
+|---|---|---|
+| `TOPUP_MAX_PROCESSED_FACTOR` | `10` | At most 10 × `max_output` candidates are processed per job |
+| `CRAWLER_COMPANY_CONCURRENCY_FACTOR` | `4` | Companies in flight = 4 × `CRAWLER_GLOBAL_CONCURRENCY` |
+| `CRAWLER_CONNECT_TIMEOUT_S` / `CRAWLER_READ_TIMEOUT_S` | `5` / `10` s | Page request timeouts (`CRAWLER_HTTP_TIMEOUT_S` = 20 s stays the overall value) |
+| `CRAWL_SITE_BUDGET_S` / `CRAWL_MAX_CONSECUTIVE_FAILURES` | `45` s / `2` | A site's crawl stops after 45 s (pages already fetched are kept; no homepage within 45 s = skipped), or after 2 non-home fetches in a row end with a network error |
+| `OVERPASS_MAX_CONCURRENCY` | `2` | Overpass requests in flight per endpoint |
+| `OVERPASS_MIRROR_URLS` / `OVERPASS_MIRROR_CONNECT_TIMEOUT_S` | 2 mirrors / `5` s | Failover endpoints for the public default only |
+| `COUNTRY_SPLIT_MAX_SUBDIVISIONS` | `40` | `regions: []` is split into the country's first-level subdivisions when it has 1–40 of them |
+| `SITEMAP_MAX_LOCS` / `SITEMAP_MAX_CHILDREN` | `1000` / `1` | Sitemap parsing limits (sitemap fetches count toward the 5-page budget) |
+| `IDENTITY_NAME_MIN_SCORE` / `IDENTITY_NAME_ONLY_MIN_SCORE` | `85` / `95` | Name score a looked-up website needs with location evidence / on the name alone (only for a company without postcode and city; never for a guessed domain) |
+| `WEB_SEARCH_MIN_INTERVAL_S` / `WEB_SEARCH_BUDGET_PER_JOB` / `WEB_SEARCH_DAILY_BUDGET` | `3` s / `60` / `1000` | Search spacing and budgets |
+| `WEB_SEARCH_COOLDOWN_S` / `WEB_SEARCH_TIMEOUT_S` / `WEB_SEARCH_MAX_RESULTS` | `900` s / `10` s / `10` | Pause after blocking or an unreadable robots.txt; request timeout; results kept per query |
+| `LOOKUP_MAX_TRIES` / `LOOKUP_DOMAIN_MIN_SCORE` | `2` / `80` | Search results crawled per company; domain-vs-name plausibility |
+| `WEBSITE_GUESS_ENABLED` / `GUESS_MAX_DOMAINS` / `GUESS_MIN_NAME_LEN` | `True` / `3` / `6` | Domain guessing from the name (DNS first); names whose joined slug is shorter than 6 are not guessed |
+| `WEB_DISCOVERY_QUERIES_PER_SLICE` / `WEB_DISCOVERY_BUDGET_FRACTION` | `3` / `1/3` | Discovery queries per slice (1 alongside Overpass, the rest only when the target is not met); at most 20 of the 60 searches per job |
+| `GAZETTEER_PLACE_TYPES` | city, town, village, suburb, hamlet | Place names used by the region check for web-found companies |
+| `JS_SHELL_TEXT_MAX` | `200` | Visible-text limit below which a homepage counts as a JavaScript app shell (measured only) |
+
+### 3.1 Web search (`WEB_SEARCH_URL`)
+
+Web search is **on by default** and needs no key. It is used for two things: finding the website
+of an OSM company that has none, and discovering companies that are not in OSM.
+
+- **Default: DuckDuckGo HTML** (`https://html.duckduckgo.com/html/`). Scraping a search engine's
+  result pages may conflict with its terms of service; this risk was accepted as a product
+  decision. If that is not acceptable for your deployment, set `WEB_SEARCH_URL=off` or use your
+  own SearXNG.
+- **`WEB_SEARCH_URL=off`** switches all web search off: no website lookups by search, no web
+  discovery, and `resolved.sources` is `["osm"]`. Domain guessing from the name (DNS first) and
+  the OSM email-domain lookup still work.
+- **SearXNG:** any other http(s) URL is treated as a SearXNG-compatible instance and queried at
+  `<url>/search?format=json`. A self-hosted instance is the way to avoid a third-party search
+  engine.
+- **Empty value** = the default (like every other variable).
+- **Politeness:** 1 search request in flight per process, at least 3 s apart, at most 60 per job
+  (discovery may use at most 20 of them) and 1000 per day. The backend's robots.txt is read on
+  first use: an explicit disallow switches search off for the process; an unreadable robots.txt
+  pauses it for 15 minutes. HTTP 202/403/429 or a CAPTCHA page pauses it for 15 minutes (circuit
+  breaker). The User-Agent is the honest `CRAWLER_USER_AGENT`. Result URLs are only fetched
+  through the crawler, with the SSRF guard and robots.txt of each site.
 
 ## 4. Enabling the API key
 
@@ -175,6 +219,8 @@ deliberately no update script, and runtime stays offline. To refresh by hand:
 | Whole-country request (`regions: []`) returns few or no results | A country-wide Overpass query can exceed the public instance's time or memory limits (each query allows up to 180 s on the server, 240 s on the client). Request specific regions instead, or use a self-hosted Overpass. |
 | `422 unresolved_region` for a city | City/district level needs `NOMINATIM_URL`. Otherwise use a province/state or add an alias in `config/overrides/aliases.yaml`. |
 | `404` on a job you fetched earlier | Reading never deletes, so the job was removed by `DELETE`, by a `2xx` callback, by TTL (15 min after finishing, 30 min after failing), or by a container restart. Export within the TTL, or raise `JOB_TTL_MINUTES` in `.env`. |
+| Warnings such as "Web search budget exhausted", "Web search is paused …" | The search budget (60 per job) was used up, or the backend blocked or its robots.txt could not be read (search pauses for 15 min). The job still succeeds with what it found. Use SearXNG (`WEB_SEARCH_URL`) or `off`. |
+| A company found by web search is missing although it is in the area | Web-found companies need their own address on the legal notice (or in JSON-LD), inside the area. A **whole-country** slice has no area gazetteer and only accepts postcodes that OSM companies of the job also have. In the **UK**, full postcodes (`SW1A 1AA`) are compared exactly, so they only match postcodes of OSM companies of the job, not postcode districts. Discovery queries for a whole-country slice use the English country name (e.g. "Germany"). |
 | Callback never arrives | It is a single attempt with a 10 s timeout. Check reachability from the container and the logs (`callback_failed` / `callback_rejected`). The job stays pollable until its TTL. |
 | `429 rate_limited` from behind a proxy | All clients share the proxy's IP bucket; see §6. |
 | All jobs gone after a restart | By design: state is in memory only. |
