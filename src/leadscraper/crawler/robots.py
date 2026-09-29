@@ -1,13 +1,8 @@
-"""robots.txt handling with protego (ARCHITECTURE.md §3.6 "robots.txt is respected").
-
-One :class:`RobotsCache` per job (C7). Rules follow RFC 9309: ``2xx`` → parse; ``4xx`` (incl.
-404) → no restrictions; ``5xx`` / network error / redirect to a non-public host → treated as a
-complete disallow (conservative). ``Crawl-delay`` for our user agent raises the per-domain delay
-(capped). robots.txt requests do not count against the per-domain page limit.
-"""
+"""Robots.txt handling with protego."""
 
 from __future__ import annotations
 
+import httpx
 from protego import Protego
 
 from leadscraper import constants as C
@@ -15,6 +10,9 @@ from leadscraper.crawler.fetcher import SKIP_NETWORK, Fetcher
 from leadscraper.crawler.website import Website
 
 _ALLOW_ALL = Protego.parse("")
+#: robots.txt keeps the full read timeout, so the tighter page read timeout never turns a slow
+#: robots.txt into a disallow-all (RFC 9309 semantics below are unchanged).
+ROBOTS_TIMEOUT = httpx.Timeout(C.CRAWLER_HTTP_TIMEOUT_S, connect=C.CRAWLER_CONNECT_TIMEOUT_S)
 _DISALLOW_ALL = Protego.parse("User-agent: *\nDisallow: /\n")
 
 
@@ -27,7 +25,13 @@ class RobotsCache:
     def attach(self) -> RobotsCache:
         """Make the fetcher check every page (and redirect hop) against robots.txt."""
         self.fetcher.robots = self.allowed
+        self.fetcher.sitemaps = self.sitemaps
         return self
+
+    async def sitemaps(self, site: Website) -> list[str]:
+        """``Sitemap:`` URLs of the site's robots.txt; empty for the allow-all and disallow-all
+        defaults."""
+        return list((await self.rules_for(site)).sitemaps)
 
     async def rules_for(self, site: Website) -> Protego:
         key = site.origin
@@ -37,7 +41,8 @@ class RobotsCache:
 
     async def _load(self, site: Website) -> Protego:
         res = await self.fetcher.fetch(f"{site.origin}/robots.txt", count_page=False,
-                                       html_only=False, max_bytes=C.ROBOTS_MAX_BYTES)
+                                       html_only=False, max_bytes=C.ROBOTS_MAX_BYTES,
+                                       timeout=ROBOTS_TIMEOUT)
         if res.html is not None and res.status is not None and 200 <= res.status < 300:
             rules = Protego.parse(res.html)
             self.fetcher.set_crawl_delay(site.registered_domain, rules.crawl_delay(self.user_agent))
