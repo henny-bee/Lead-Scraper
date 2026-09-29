@@ -1,9 +1,4 @@
-"""Environment settings — exactly the variables of ARCHITECTURE.md §9, with the §9 defaults.
-
-No ``pydantic-settings`` (PLAN.md Q16): a Pydantic v2 model is populated from ``os.environ``.
-Only the names in :data:`ENV_VARS` are ever read. Non-env limits/tunables live in
-:mod:`leadscraper.constants`.
-"""
+"""Environment settings — the variables of, with the defaults, plus ``WEB_SEARCH_URL``."""
 
 from __future__ import annotations
 
@@ -11,11 +6,17 @@ import os
 from collections.abc import Mapping
 from functools import lru_cache
 
-from pydantic import BaseModel, ConfigDict, Field
+from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+#: the one env var added to the contract (default = DuckDuckGo HTML).
+_DDG_HTML_URL = "https://html.duckduckgo.com/html/"         # == constants.DUCKDUCKGO_HTML_URL
+_SEARCH_OFF = "off"                                           # == constants.WEB_SEARCH_OFF
 
 
 class Settings(BaseModel):
-    """All A§9 variables. Field alias = environment variable name."""
+    """All variables."""
 
     model_config = ConfigDict(frozen=True, populate_by_name=True, extra="forbid")
 
@@ -58,6 +59,38 @@ class Settings(BaseModel):
     # Optional security
     api_key: str = Field(default="", alias="API_KEY")
 
+    # additions, after the block.: web search for website lookup + discovery.
+    web_search_url: str = Field(default=_DDG_HTML_URL, alias="WEB_SEARCH_URL")
+
+    @field_validator("web_search_url")
+    @classmethod
+    def _check_web_search_url(cls, value: str) -> str:
+        v = value.strip()
+        if v.lower() == _SEARCH_OFF:
+            return _SEARCH_OFF
+        try:
+            parts = urlsplit(v)
+        except ValueError as exc:
+            raise ValueError("WEB_SEARCH_URL must be 'off' or an http(s) URL") from exc
+        host = (parts.hostname or "").lower()
+        if parts.scheme not in ("http", "https") or not host:
+            raise ValueError("WEB_SEARCH_URL must be 'off' or an http(s) URL")
+        labels = host.split(".")
+        if "google" in labels[:-1] or host == "bing.com" or host.endswith(".bing.com"):
+            raise ValueError("Google/Bing are not supported (robots.txt disallows /search)")
+        return v
+
+    @property
+    def web_search_enabled(self) -> bool:
+        return self.web_search_url != _SEARCH_OFF
+
+    @property
+    def web_search_backend(self) -> str | None:
+        """``"duckduckgo"`` | ``"searxng"`` | ``None`` (off)."""
+        if not self.web_search_enabled:
+            return None
+        return "duckduckgo" if self.web_search_url == _DDG_HTML_URL else "searxng"
+
     @property
     def auth_enabled(self) -> bool:
         return bool(self.api_key)
@@ -67,22 +100,19 @@ class Settings(BaseModel):
         return int(self.crawler_max_response_mb * 1024 * 1024)
 
 
-#: The exact environment contract (A§9), in declaration order.
+#: The environment contract: in declaration order, then the additions.
 ENV_VARS: tuple[str, ...] = tuple(f.alias for f in Settings.model_fields.values() if f.alias)
 
 
 def _clean(value: str) -> str:
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        value = value[1:-1]  # tolerate quoted values (A§9 quotes CRAWLER_USER_AGENT)
+        value = value[1:-1]  # tolerate quoted values
     return value
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
-    """Build settings from ``environ`` (default ``os.environ``); reads only :data:`ENV_VARS`.
-
-    An empty value means "use the A§9 default" (e.g. ``PORT=`` behaves like an unset ``PORT``).
-    """
+    """Build settings from ``environ`` (default ``os.environ``); reads only:data:`ENV_VARS`."""
     env = os.environ if environ is None else environ
     values: dict[str, str] = {}
     for name in ENV_VARS:
@@ -97,5 +127,5 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Process-wide settings (cached). Tests call ``get_settings.cache_clear()`` after patching env."""
+    """Process-wide settings (cached)."""
     return load_settings()
