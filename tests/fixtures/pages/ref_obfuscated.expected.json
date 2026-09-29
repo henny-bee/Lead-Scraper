@@ -1,0 +1,17 @@
+{
+  "emails": [
+    "3f2a9c81b4d05e67a1b2c3d4@logs.acme-example.com",
+    "hr@acme-example.com",
+    "info@acme-example.com",
+    "press@acme-example.com",
+    "support@acme-example.com"
+  ],
+  "page_emails": [
+    "hr@acme-example.com",
+    "info@acme-example.com",
+    "john@acme-example.com",
+    "press@acme-example.com",
+    "sales@acme-example.com",
+    "support@acme-example.com"
+  ]
+}
