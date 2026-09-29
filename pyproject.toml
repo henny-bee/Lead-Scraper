@@ -40,11 +40,12 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--import-mode=importlib -p no:cacheprovider -m \"not live\""
+addopts = "--import-mode=importlib -p no:cacheprovider -m \"not live and not benchmark\""
 filterwarnings = [
     # starlette suggests the new `httpx2` package; not in the approved dependency list (PLAN §2.1)
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 markers = [
     "live: opt-in live smoke tests against public services (skipped by default)",
+    "benchmark: opt-in deterministic fixture benchmark, PLAN.md V00/V17 (skipped by default)",
 ]
