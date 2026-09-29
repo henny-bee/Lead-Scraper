@@ -1,0 +1,10 @@
+{
+  "emails": [
+    "dave@acme-example.com",
+    "eve@acme-example.com"
+  ],
+  "page_emails": [
+    "dave@acme-example.com",
+    "eve@acme-example.com"
+  ]
+}
