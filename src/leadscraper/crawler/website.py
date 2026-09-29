@@ -1,14 +1,4 @@
-"""Website resolver (ARCHITECTURE.md §3.4 "website" row, §3.8, §4; PLAN.md Q21, Q22).
-
-For each candidate: take the website from the source (OSM ``website``/``contact:website``),
-normalise it (scheme added, host lower-cased, default port / fragment / tracking parameters
-removed), reject non-http(s), invalid, IP-literal-private and social/directory-only targets, and
-compute the registered domain (tldextract ``top_domain_under_public_suffix``, bundled PSL, no
-network). During crawl the redirect chain is followed hop by hop by
-:meth:`leadscraper.crawler.fetcher.Fetcher.fetch` (the only code that sends crawl requests, so C11
-politeness always applies) — every hop is checked against private/loopback/link-local/reserved
-addresses (SSRF, Q21) — and the final origin becomes the company's ``website``. Candidates without a usable website are skipped in core mode (A§4).
-"""
+"""Website resolver."""
 
 from __future__ import annotations
 
@@ -55,7 +45,8 @@ class Website:
 
 
 def registered_domain(url: str | None) -> str | None:
-    """``https://www.shop.firma-example.de/x`` → ``firma-example.de``; ``None`` for IPs / invalid hosts."""
+    """``https://www.shop.firma-example.de/x`` → ``firma-example.de``; ``None`` for IPs / invalid
+    hosts."""
     if not url or not url.strip():
         return None
     raw = url.strip()
@@ -99,7 +90,7 @@ def is_public_ip(ip: str | ipaddress.IPv4Address | ipaddress.IPv6Address) -> boo
 
 
 def normalize_website(raw: str | None) -> Website:
-    """Normalise a source website value or raise :class:`WebsiteRejected`."""
+    """Normalise a source website value or raise:class:`WebsiteRejected`."""
     if not raw or not raw.strip():
         raise WebsiteRejected(SKIP_NO_WEBSITE)
     value = raw.strip().split(";")[0].split(" ")[0].strip()      # OSM: "a-example.de;b-example.de" → first
@@ -146,7 +137,7 @@ def normalize_website(raw: str | None) -> Website:
 
 
 def website_for(candidate: CompanyCandidate) -> Website:
-    """The candidate's usable website (source tags), or :class:`WebsiteRejected`."""
+    """The candidate's usable website (source tags), or:class:`WebsiteRejected`."""
     return normalize_website(candidate.website)
 
 
@@ -157,16 +148,13 @@ async def system_resolve(host: str) -> list[str]:
 
 
 class HostGuard:
-    """Checks that a host resolves only to public addresses (Q21). Per-job cache only (C7).
-
-    Known limitation (accepted for v0.3, Supervisor T13 review): this lookup and the one httpx
-    performs when connecting are separate, so DNS rebinding (a host answering with a public
-    address here and a private one at connect time) is not prevented.
-    """
+    """Checks that a host resolves only to public addresses."""
 
     def __init__(self, resolve: Resolve = system_resolve) -> None:
         self._resolve = resolve
         self._cache: dict[str, bool] = {}
+        #: hosts whose lookup returned no address or failed.
+        self.unresolvable: set[str] = set()
 
     async def is_public(self, host: str) -> bool:
         host = host.lower().strip("[]")
@@ -180,6 +168,8 @@ class HostGuard:
                 addrs = await self._resolve(host)
             except (OSError, UnicodeError):
                 addrs = []
+            if not addrs:
+                self.unresolvable.add(host)
             ok = bool(addrs) and all(is_public_ip(a) for a in addrs)
         self._cache[host] = ok
         return ok
