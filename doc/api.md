@@ -48,7 +48,7 @@ Every error uses the same shape:
 |---|---|---|
 | `country` | string, required | 2–100 characters. A country name in any language, or an ISO alpha-2/alpha-3 code (`Germany`, `Deutschland`, `Allemagne`, `DE`, `DEU`). |
 | `regions` | string[] | 0–50 items. Empty means the whole country. ISO 3166-2 names or codes, aliases (`NRW`, `Bavaria`, `paca`), small typos. City level needs `NOMINATIM_URL`. |
-| `industries` | string[], required | 1–20 free-text values in any language, mapped to ISIC Rev.4 |
+| `industries` | string[], optional | 0–20 free-text values in any language, mapped to ISIC Rev.4. Omitted or empty = all companies in the area (OSM entries with an `office`, `craft` or `industrial` tag, or `man_made=works`); web-search discovery is skipped then, and a warning says so |
 | `information` | enum[], required | One or more of `company_name`, `company_email`, `website`, `phone`, `address`, `legal_form`, `register_number`, `vat_id` |
 | `max_output` | int | 1–5000, default 100 |
 | `verify_emails` | bool | Default `false`. Syntax + DNS check; unusable emails are replaced or the company is dropped. It adds no fields to the output. |
@@ -89,7 +89,7 @@ This is a dry run: it shows how the input is interpreted, and nothing is scraped
       { "input": "Logistics", "isic": ["49", "52", "53"], "scheme": "ISIC", "version": "Rev.4",
         "keywords": { "en": ["logistics", "freight", "forwarding", "warehouse"] }, "method": "catalog" }
     ],
-    "sources": ["osm"],
+    "sources": ["osm", "web_search"],
     "known_in_job": 0,
     "compliance_note": "US: Check local data protection and outreach rules before using the data for marketing.",
     "warnings": ["Tier C: business websites are not required to publish a legal notice, so the email yield is expected to be lower."]
@@ -100,16 +100,27 @@ This is a dry run: it shows how the input is interpreted, and nothing is scraped
 What the fields mean:
 - **`method`**
   - For regions: `exact`, `alias`, `fuzzy` (with a warning), or `country` when `regions` is empty.
-  - For industries: `catalog`, `alias` or `fuzzy`.
+  - For industries: `catalog`, `alias` or `fuzzy`; `any` when the request has no industries.
 - **`tier`**
   - A: an open company register exists (GB, FR, NO).
   - B: EU/EEA/CH, where a legal notice is mandatory.
   - C: everything else.
 
   The tier is informational only: it tells you what email yield to expect.
-- **`sources`** lists only the adapters that are enabled. In v0.3 that is always `["osm"]`.
+- **`sources`** lists only the adapters that are enabled: `["osm", "web_search"]` by default,
+  `["osm"]` with `WEB_SEARCH_URL=off`.
 - **`warnings`** include fuzzy corrections, tier notes, and fields that may be unavailable for the
-  country (such fields are returned as `null`).
+  country (such fields are returned as `null`). While a job runs, warnings about its sources are
+  appended to `resolved.warnings` (visible in the `running` body of `GET /scrape/{job_id}`), for
+  example:
+  - `Overpass unavailable for slice NRW × Maschinenbau (http 504 at overpass-api.de); slice skipped.`
+  - `Overpass query for slice NRW × Maschinenbau failed/timed out on the server (overpass.kumi.systems); slice skipped.`
+  - `Overpass request budget exhausted for slice NRW × Maschinenbau; results may be fewer than max_output.`
+  - `Overpass area gazetteer unavailable (request budget exhausted); the region check for non-OSM candidates uses OSM postcodes and area names only.`
+  - `Web search budget exhausted for this job; results may be fewer than max_output.`
+  - `Web search is paused after the search backend blocked requests; results may be fewer than max_output.`
+  - `Web search is paused: the search backend's robots.txt could not be read.`
+  - `Daily web search limit reached; results may be fewer than max_output.`
 
 An unresolvable industry gives `422 unresolved_industry`. Its `details.suggestions` hold the
 nearest ISIC titles, e.g. `{"isic": "47", "title": "Retail trade, except of motor vehicles and motorcycles"}`.
@@ -176,6 +187,12 @@ How company objects are built:
 - `phone` is in E.164 format.
 - If `count < max_output`, the status is still `success`: the sources were exhausted or the
   per-job budget was reached.
+- A company found by **web search** (not in OSM) is returned only when its legal notice (or
+  JSON-LD) gives its legal name, which is the `company_name` (the search result title is never
+  used), when its home or legal page mentions the industry, and when its own address is inside
+  the requested area (see `doc/architecture.md` §2: a whole-country slice accepts only postcodes
+  of the job's OSM companies; UK full postcodes match only those). If it is the same company as
+  an OSM entry, one record is returned with the OSM entry's `region`/`industry` labels.
 
 Other states:
 - `{"status":"failed","job_id":"…","error":{"code":"…","message":"…","details":{}}}`, for example
@@ -315,6 +332,59 @@ About the fields:
 - **Failed or cancelled:** the same shapes as for scrape jobs.
 - There is no `DELETE /verify/{id}`. Verify jobs expire by TTL.
 
+## `GET /contacts`
+
+Contact details of one website. Synchronous: the
+crawl uses the same polite crawler as scrape jobs (robots.txt, 2 s per-domain delay, SSRF guard,
+honest User-Agent), so it takes a few seconds up to about a minute (`deep`: up to 2 minutes).
+
+`GET /contacts?website=acme-logistik.de[&mode=key_pages][&country=DE]`
+
+| Parameter | Description |
+|---|---|
+| `website` | Required. Bare domain or full URL. Social-media and directory hosts are rejected |
+| `mode` | `homepage` (1 page), `key_pages` (default: homepage + legal notice/contact pages, max 5), `deep` (up to 20 keyword-matching pages) |
+| `country` | Optional. Region for phone parsing and page keywords. Default: the ccTLD (`.de` → DE), else DE |
+
+Response (same keys for unreachable sites: empty lists and `error` holding the reason):
+
+```json
+{"domain": "acme-logistik.de", "title": "Acme Logistik GmbH – Spedition",
+ "description": "Ihre Spedition in Bremen.",
+ "emails": [{"value": "info@acme-logistik.de",
+             "sources": ["https://acme-logistik.de/impressum", "https://acme-logistik.de/kontakt"],
+             "is_likely_official": true}],
+ "phones": ["+494211234567"],
+ "linkedins": [{"value": "https://linkedin.com/company/acme-logistik",
+                "sources": ["https://acme-logistik.de/"], "is_likely_official": true}],
+ "twitters": [], "instagrams": [], "facebooks": [], "youtubes": [], "tiktoks": [],
+ "pinterests": [], "discords": [], "snapchats": [], "threads": [], "telegrams": [],
+ "reddits": [], "whatsapps": [], "githubs": [], "blueskys": [], "mediums": [], "calendlys": [],
+ "error": null}
+```
+
+- `emails` are ranked best first. `is_likely_official` = on the site's own domain and not a
+  special-function address (`datenschutz@`, `jobs@`, …). Suppressed addresses are never returned.
+- Social profiles: the first entry per platform is flagged official when it is a real link or the
+  only profile found. Share/login/content URLs and site-builder vendor profiles are dropped.
+- Not included (unlike the hosted reference API): `technologies` and the AI `best_sales_email`.
+
+## `POST /websites/find`
+
+Finds a company's website from its name. No AI: candidates come from the email domain, web search
+(`WEB_SEARCH_URL`) and domain guesses (DNS-checked), and each is confirmed by crawling it and
+checking that the site names the company (and, if given, its location from the site's own legal
+notice).
+
+```json
+{"name": "Acme Logistik GmbH", "country": "DE", "city": "Bremen", "postcode": "28195"}
+```
+
+`name` is required. Used context keys: `country`, `city`, `postcode` (`postal_code`, `zip`,
+`plz`), `email`; other keys are accepted and ignored. Response:
+`{"website": "https://acme-logistik.de", "method": "guess"}`, or `{"website": null, "method": null}`
+when no candidate is confirmed. `method` is `email_domain`, `search` or `guess`.
+
 ## `GET /meta/*`
 
 These endpoints use local data only.
@@ -346,3 +416,8 @@ these metric families:
 - `tiles_saturated_total{source}`
 - `source_budget_used{source}`
 - `smtp_results_total{result}`
+- `websites_resolved_total{method}`: accepted companies by how their website was found:
+  `osm_tag`, `email_domain`, `search`, `guess`, `web_discovery` (found by web search, not in OSM),
+  `web_discovery_merged` (a web result merged into an OSM company without a website)
+- `crawl_js_shells_total`: crawled homepages that look like JavaScript app shells (counted only;
+  nothing is rendered)
