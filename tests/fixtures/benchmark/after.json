@@ -1,0 +1,767 @@
+{
+ "recorded": "2026-09-29",
+ "code": "PLAN v0.4 V00–V16 (fast & fill), before V17 sign-off",
+ "python": "CPython 3.12.14 (Windows venv via WSL interop; time.monotonic resolution 15.6 ms)",
+ "command_fixture": "pytest -m benchmark -q -s tests/benchmark/test_fixture_benchmark.py  (3 runs per scenario/config; timing keys = median; S1/S4 at the production 3 s search interval, S2 patched to 0.05 s)",
+ "command_live": "pytest -m live -q -s tests/benchmark/test_live_benchmark.py",
+ "fixture": {
+  "S1": {
+   "default": {
+    "scenario": "S1",
+    "config": "default",
+    "new_code": true,
+    "wall_s": 0.891,
+    "count": 20,
+    "target": 20,
+    "fill_rate": 1.0,
+    "with_email": 20,
+    "with_website": 20,
+    "candidates": 46,
+    "crawled": 23,
+    "email_yield": 0.8696,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 0.4762,
+    "correct": 20,
+    "recoverable": 42,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 84,
+    "max_requests_per_domain": 2,
+    "min_same_domain_gap_s": 0.1807,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.244,
+    "gazetteer_requests": 0,
+    "search_requests": 1,
+    "directory_requests": 0,
+    "time_to_first_s": 0.75,
+    "time_to_10_s": 0.84,
+    "time_to_target_s": 0.888,
+    "by_source": {
+     "osm_tag": 17,
+     "email_domain": 3
+    },
+    "candidates_by_source": {
+     "osm": 46,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     1.032,
+     0.891,
+     0.881
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 17,
+      "email_domain": 3
+     },
+     {
+      "osm_tag": 18,
+      "email_domain": 2
+     },
+     {
+      "osm_tag": 19,
+      "email_domain": 1
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 0.85,
+     "email_domain": 0.15
+    },
+    "vs_baseline": {
+     "wall_s": 0.612,
+     "correct": 2.857
+    }
+   },
+   "off": {
+    "scenario": "S1",
+    "config": "off",
+    "new_code": true,
+    "wall_s": 0.878,
+    "count": 20,
+    "target": 20,
+    "fill_rate": 1.0,
+    "with_email": 20,
+    "with_website": 20,
+    "candidates": 46,
+    "crawled": 23,
+    "email_yield": 0.8696,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 0.6452,
+    "correct": 20,
+    "recoverable": 31,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 84,
+    "max_requests_per_domain": 2,
+    "min_same_domain_gap_s": 0.1839,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.223,
+    "gazetteer_requests": 0,
+    "search_requests": 0,
+    "directory_requests": 0,
+    "time_to_first_s": 0.758,
+    "time_to_10_s": 0.779,
+    "time_to_target_s": 0.875,
+    "by_source": {
+     "osm_tag": 17,
+     "email_domain": 3
+    },
+    "candidates_by_source": {
+     "osm": 46,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     0.884,
+     0.846,
+     0.878
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 17,
+      "email_domain": 3
+     },
+     {
+      "osm_tag": 17,
+      "email_domain": 3
+     },
+     {
+      "osm_tag": 19,
+      "email_domain": 1
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 0.85,
+     "email_domain": 0.15
+    },
+    "vs_baseline": {
+     "wall_s": 0.608,
+     "correct": 2.857
+    }
+   }
+  },
+  "S2": {
+   "default": {
+    "scenario": "S2",
+    "config": "default",
+    "new_code": true,
+    "wall_s": 4.132,
+    "count": 42,
+    "target": 60,
+    "fill_rate": 0.7,
+    "with_email": 42,
+    "with_website": 42,
+    "candidates": 53,
+    "crawled": 47,
+    "email_yield": 0.8936,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 1.0,
+    "correct": 42,
+    "recoverable": 42,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 160,
+    "max_requests_per_domain": 5,
+    "min_same_domain_gap_s": 0.1799,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.244,
+    "gazetteer_requests": 1,
+    "search_requests": 21,
+    "directory_requests": 0,
+    "time_to_first_s": 0.799,
+    "time_to_10_s": 0.823,
+    "time_to_target_s": null,
+    "by_source": {
+     "osm_tag": 22,
+     "email_domain": 4,
+     "search": 7,
+     "guess": 5,
+     "web_discovery": 3,
+     "web_discovery_merged": 1
+    },
+    "candidates_by_source": {
+     "osm": 46,
+     "web_search": 8
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     4.132,
+     4.071,
+     4.244
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 0.5238,
+     "email_domain": 0.0952,
+     "search": 0.1667,
+     "guess": 0.119,
+     "web_discovery": 0.0714,
+     "web_discovery_merged": 0.0238
+    },
+    "vs_baseline": {
+     "wall_s": 2.781,
+     "correct": 3.231
+    }
+   },
+   "off": {
+    "scenario": "S2",
+    "config": "off",
+    "new_code": true,
+    "wall_s": 2.043,
+    "count": 31,
+    "target": 60,
+    "fill_rate": 0.5167,
+    "with_email": 31,
+    "with_website": 31,
+    "candidates": 46,
+    "crawled": 33,
+    "email_yield": 0.9394,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 1.0,
+    "correct": 31,
+    "recoverable": 31,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 118,
+    "max_requests_per_domain": 5,
+    "min_same_domain_gap_s": 0.176,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.23,
+    "gazetteer_requests": 0,
+    "search_requests": 0,
+    "directory_requests": 0,
+    "time_to_first_s": 0.744,
+    "time_to_10_s": 0.811,
+    "time_to_target_s": null,
+    "by_source": {
+     "osm_tag": 22,
+     "email_domain": 4,
+     "guess": 5
+    },
+    "candidates_by_source": {
+     "osm": 46,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     2.043,
+     2.116,
+     2.03
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "guess": 5
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "guess": 5
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "guess": 5
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 0.7097,
+     "email_domain": 0.129,
+     "guess": 0.1613
+    },
+    "vs_baseline": {
+     "wall_s": 1.426,
+     "correct": 2.385
+    }
+   },
+   "searxng": {
+    "scenario": "S2",
+    "config": "searxng",
+    "new_code": true,
+    "wall_s": 4.097,
+    "count": 42,
+    "target": 60,
+    "fill_rate": 0.7,
+    "with_email": 42,
+    "with_website": 42,
+    "candidates": 53,
+    "crawled": 47,
+    "email_yield": 0.8936,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 1.0,
+    "correct": 42,
+    "recoverable": 42,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 160,
+    "max_requests_per_domain": 5,
+    "min_same_domain_gap_s": 0.1801,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.244,
+    "gazetteer_requests": 1,
+    "search_requests": 21,
+    "directory_requests": 0,
+    "time_to_first_s": 0.744,
+    "time_to_10_s": 0.832,
+    "time_to_target_s": null,
+    "by_source": {
+     "osm_tag": 22,
+     "email_domain": 4,
+     "search": 7,
+     "guess": 5,
+     "web_discovery": 3,
+     "web_discovery_merged": 1
+    },
+    "candidates_by_source": {
+     "osm": 46,
+     "web_search": 8
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     4.093,
+     4.097,
+     4.179
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     },
+     {
+      "osm_tag": 22,
+      "email_domain": 4,
+      "search": 7,
+      "guess": 5,
+      "web_discovery": 3,
+      "web_discovery_merged": 1
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 0.5238,
+     "email_domain": 0.0952,
+     "search": 0.1667,
+     "guess": 0.119,
+     "web_discovery": 0.0714,
+     "web_discovery_merged": 0.0238
+    },
+    "vs_baseline": {
+     "wall_s": 2.757,
+     "correct": 3.231
+    }
+   }
+  },
+  "S3": {
+   "default": {
+    "scenario": "S3",
+    "config": "default",
+    "new_code": true,
+    "wall_s": 2.644,
+    "count": 40,
+    "target": 40,
+    "fill_rate": 1.0,
+    "with_email": 40,
+    "with_website": 40,
+    "candidates": 40,
+    "crawled": 40,
+    "email_yield": 1.0,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 1.0,
+    "correct": 40,
+    "recoverable": 40,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 120,
+    "max_requests_per_domain": 2,
+    "min_same_domain_gap_s": 0.1783,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 2,
+    "discovery_wall_s": 2.083,
+    "gazetteer_requests": 0,
+    "search_requests": 1,
+    "directory_requests": 0,
+    "time_to_first_s": 1.547,
+    "time_to_10_s": 1.601,
+    "time_to_target_s": 2.644,
+    "by_source": {
+     "osm_tag": 40
+    },
+    "candidates_by_source": {
+     "osm": 40,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     2.644,
+     2.639,
+     2.656
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 40
+     },
+     {
+      "osm_tag": 40
+     },
+     {
+      "osm_tag": 40
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "vs_baseline": {
+     "wall_s": 0.578,
+     "time_to_target_s": 0.578,
+     "correct": 1.0
+    }
+   },
+   "off": {
+    "scenario": "S3",
+    "config": "off",
+    "new_code": true,
+    "wall_s": 2.605,
+    "count": 40,
+    "target": 40,
+    "fill_rate": 1.0,
+    "with_email": 40,
+    "with_website": 40,
+    "candidates": 40,
+    "crawled": 40,
+    "email_yield": 1.0,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 1.0,
+    "correct": 40,
+    "recoverable": 40,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 120,
+    "max_requests_per_domain": 2,
+    "min_same_domain_gap_s": 0.1881,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 2,
+    "discovery_wall_s": 2.052,
+    "gazetteer_requests": 0,
+    "search_requests": 0,
+    "directory_requests": 0,
+    "time_to_first_s": 1.554,
+    "time_to_10_s": 1.554,
+    "time_to_target_s": 2.605,
+    "by_source": {
+     "osm_tag": 40
+    },
+    "candidates_by_source": {
+     "osm": 40,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     2.605,
+     2.638,
+     2.587
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 40
+     },
+     {
+      "osm_tag": 40
+     },
+     {
+      "osm_tag": 40
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "vs_baseline": {
+     "wall_s": 0.568,
+     "time_to_target_s": 0.568,
+     "correct": 1.0
+    }
+   }
+  },
+  "S4": {
+   "default": {
+    "scenario": "S4",
+    "config": "default",
+    "new_code": true,
+    "wall_s": 2.856,
+    "count": 100,
+    "target": 100,
+    "fill_rate": 1.0,
+    "with_email": 100,
+    "with_website": 100,
+    "candidates": 200,
+    "crawled": 120,
+    "email_yield": 0.8333,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 0.625,
+    "correct": 100,
+    "recoverable": 160,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 477,
+    "max_requests_per_domain": 4,
+    "min_same_domain_gap_s": 0.1803,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.236,
+    "gazetteer_requests": 0,
+    "search_requests": 1,
+    "directory_requests": 0,
+    "time_to_first_s": 0.974,
+    "time_to_10_s": 1.035,
+    "time_to_target_s": 2.832,
+    "by_source": {
+     "osm_tag": 100
+    },
+    "candidates_by_source": {
+     "osm": 200,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     2.95,
+     2.856,
+     2.723
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 100
+     },
+     {
+      "osm_tag": 100
+     },
+     {
+      "osm_tag": 100
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "vs_baseline": {
+     "wall_s": 0.277,
+     "time_to_target_s": 0.303,
+     "correct": 1.0
+    }
+   },
+   "off": {
+    "scenario": "S4",
+    "config": "off",
+    "new_code": true,
+    "wall_s": 2.87,
+    "count": 100,
+    "target": 100,
+    "fill_rate": 1.0,
+    "with_email": 100,
+    "with_website": 100,
+    "candidates": 200,
+    "crawled": 121,
+    "email_yield": 0.8264,
+    "email_precision": 1.0,
+    "website_precision": 1.0,
+    "recall": 0.625,
+    "correct": 100,
+    "recoverable": 160,
+    "decoys_accepted": 0,
+    "duplicate_records": 0,
+    "requests_total": 479,
+    "max_requests_per_domain": 4,
+    "min_same_domain_gap_s": 0.1776,
+    "max_concurrent_per_domain": 1,
+    "max_overpass_in_flight": 1,
+    "discovery_wall_s": 0.222,
+    "gazetteer_requests": 0,
+    "search_requests": 0,
+    "directory_requests": 0,
+    "time_to_first_s": 1.031,
+    "time_to_10_s": 1.031,
+    "time_to_target_s": 2.851,
+    "by_source": {
+     "osm_tag": 100
+    },
+    "candidates_by_source": {
+     "osm": 200,
+     "web_search": 0
+    },
+    "runs": 3,
+    "wall_s_runs": [
+     2.824,
+     2.921,
+     2.87
+    ],
+    "by_source_runs": [
+     {
+      "osm_tag": 100
+     },
+     {
+      "osm_tag": 100
+     },
+     {
+      "osm_tag": 100
+     }
+    ],
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "vs_baseline": {
+     "wall_s": 0.277,
+     "time_to_target_s": 0.307,
+     "correct": 1.0
+    }
+   }
+  }
+ },
+ "live": {
+  "L1": [
+   {
+    "scenario": "L1",
+    "wall_s": 27.76,
+    "time_to_10_s": 19.94,
+    "time_to_target_s": 27.76,
+    "status": "success",
+    "count": 20,
+    "target": 20,
+    "fill_rate": 1.0,
+    "with_email_pct": 100.0,
+    "with_website_pct": 100.0,
+    "same_domain_email_pct": 90.0,
+    "email_yield": 0.7407,
+    "candidates": 75,
+    "candidates_with_website_tag": 33,
+    "crawled": 27,
+    "warnings": [
+     "Web search was blocked by the search backend and is paused; results may be fewer than max_output."
+    ],
+    "crawl_requests": 115,
+    "crawl_status_share": {
+     "2xx": 0.7217,
+     "3xx": 0.2087,
+     "4xx_other": 0.0174,
+     "5xx": 0.0261,
+     "error": 0.0261
+    },
+    "by_source": {
+     "osm_tag": 20
+    },
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "candidates_by_source": {
+     "osm": 79,
+     "web_search": 0
+    },
+    "web_search": {
+     "backend": "duckduckgo",
+     "requests": 2,
+     "breaker_tripped": true,
+     "blocked_warnings": [
+      "Web search was blocked by the search backend and is paused; results may be fewer than max_output."
+     ]
+    }
+   }
+  ],
+  "L2": [
+   {
+    "scenario": "L2",
+    "wall_s": 98.45,
+    "time_to_10_s": 26.61,
+    "time_to_target_s": 98.45,
+    "status": "success",
+    "count": 50,
+    "target": 50,
+    "fill_rate": 1.0,
+    "with_email_pct": 100.0,
+    "with_website_pct": 100.0,
+    "same_domain_email_pct": 84.0,
+    "email_yield": 0.6757,
+    "candidates": 216,
+    "candidates_with_website_tag": 94,
+    "crawled": 74,
+    "warnings": [
+     "Web search was blocked by the search backend and is paused; results may be fewer than max_output."
+    ],
+    "crawl_requests": 327,
+    "crawl_status_share": {
+     "2xx": 0.6483,
+     "3xx": 0.2049,
+     "403": 0.0122,
+     "4xx_other": 0.1009,
+     "5xx": 0.0122,
+     "error": 0.0214
+    },
+    "by_source": {
+     "osm_tag": 50
+    },
+    "by_source_share": {
+     "osm_tag": 1.0
+    },
+    "candidates_by_source": {
+     "osm": 229,
+     "web_search": 0
+    },
+    "web_search": {
+     "backend": "duckduckgo",
+     "requests": 2,
+     "breaker_tripped": true,
+     "blocked_warnings": [
+      "Web search was blocked by the search backend and is paused; results may be fewer than max_output."
+     ]
+    }
+   }
+  ]
+ },
+ "live_note": "1 run per request (2026-09-29 23:58 Berlin), default config (search on, DuckDuckGo HTML). DuckDuckGo answered the honest User-Agent with HTTP 202 on the first query in both runs → circuit breaker, no search contribution; the UA was not changed. V00 comparison: L1 wall 28.53 s / 33.5 s / 50.3 s, 14/20; L2 wall 170.43 s, 24/50."
+}
