@@ -1,0 +1,143 @@
+# Benchmark scenario S3 (PLAN.md V00 step 3): discovery speed.
+# 2 regions × 2 industries = 4 slices. The Overpass mock answers each slice query after 1.0 s with that
+# slice's 10 website-tagged elements (matched by the ISO 3166-2 area selector + an industry keyword of
+# the query). Every site has a same-domain email on a linked Impressum. Synthetic data only.
+# Recoverable: all 40.
+name: S3
+request:
+  country: Germany
+  regions: [Bremen, Hamburg]
+  industries: [Logistik, Maschinenbau]
+  information: [company_name, company_email, website]
+  max_output: 40
+env:
+  CRAWLER_PER_DOMAIN_DELAY_S: "0.2"
+site_latency_s: 0.02
+overpass_latency_s: 1.0
+recoverable: {default: 40, "off": 40}
+decoys: 0
+elements:
+  # --- slice DE-HB × spedition ---
+  - {id: 301, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 01, legal_name: Spedition Bremen Nord 01 GmbH, city: Bremen, postcode: "28196",
+     tag_website: https://s3-hb-log-01-example.de, site: s3-hb-log-01-example.de, email: info@s3-hb-log-01-example.de,
+     expect_website: https://s3-hb-log-01-example.de, expect_email: info@s3-hb-log-01-example.de}
+  - {id: 302, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 02, legal_name: Spedition Bremen Nord 02 GmbH, city: Bremen, postcode: "28197",
+     tag_website: https://s3-hb-log-02-example.de, site: s3-hb-log-02-example.de, email: info@s3-hb-log-02-example.de,
+     expect_website: https://s3-hb-log-02-example.de, expect_email: info@s3-hb-log-02-example.de}
+  - {id: 303, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 03, legal_name: Spedition Bremen Nord 03 GmbH, city: Bremen, postcode: "28198",
+     tag_website: https://s3-hb-log-03-example.de, site: s3-hb-log-03-example.de, email: info@s3-hb-log-03-example.de,
+     expect_website: https://s3-hb-log-03-example.de, expect_email: info@s3-hb-log-03-example.de}
+  - {id: 304, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 04, legal_name: Spedition Bremen Nord 04 GmbH, city: Bremen, postcode: "28199",
+     tag_website: https://s3-hb-log-04-example.de, site: s3-hb-log-04-example.de, email: info@s3-hb-log-04-example.de,
+     expect_website: https://s3-hb-log-04-example.de, expect_email: info@s3-hb-log-04-example.de}
+  - {id: 305, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 05, legal_name: Spedition Bremen Nord 05 GmbH, city: Bremen, postcode: "28200",
+     tag_website: https://s3-hb-log-05-example.de, site: s3-hb-log-05-example.de, email: info@s3-hb-log-05-example.de,
+     expect_website: https://s3-hb-log-05-example.de, expect_email: info@s3-hb-log-05-example.de}
+  - {id: 306, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 06, legal_name: Spedition Bremen Nord 06 GmbH, city: Bremen, postcode: "28201",
+     tag_website: https://s3-hb-log-06-example.de, site: s3-hb-log-06-example.de, email: info@s3-hb-log-06-example.de,
+     expect_website: https://s3-hb-log-06-example.de, expect_email: info@s3-hb-log-06-example.de}
+  - {id: 307, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 07, legal_name: Spedition Bremen Nord 07 GmbH, city: Bremen, postcode: "28202",
+     tag_website: https://s3-hb-log-07-example.de, site: s3-hb-log-07-example.de, email: info@s3-hb-log-07-example.de,
+     expect_website: https://s3-hb-log-07-example.de, expect_email: info@s3-hb-log-07-example.de}
+  - {id: 308, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 08, legal_name: Spedition Bremen Nord 08 GmbH, city: Bremen, postcode: "28203",
+     tag_website: https://s3-hb-log-08-example.de, site: s3-hb-log-08-example.de, email: info@s3-hb-log-08-example.de,
+     expect_website: https://s3-hb-log-08-example.de, expect_email: info@s3-hb-log-08-example.de}
+  - {id: 309, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 09, legal_name: Spedition Bremen Nord 09 GmbH, city: Bremen, postcode: "28204",
+     tag_website: https://s3-hb-log-09-example.de, site: s3-hb-log-09-example.de, email: info@s3-hb-log-09-example.de,
+     expect_website: https://s3-hb-log-09-example.de, expect_email: info@s3-hb-log-09-example.de}
+  - {id: 310, kind: W, variant: plain, slice: [DE-HB, spedition], name: Spedition Bremen Nord 10, legal_name: Spedition Bremen Nord 10 GmbH, city: Bremen, postcode: "28205",
+     tag_website: https://s3-hb-log-10-example.de, site: s3-hb-log-10-example.de, email: info@s3-hb-log-10-example.de,
+     expect_website: https://s3-hb-log-10-example.de, expect_email: info@s3-hb-log-10-example.de}
+  # --- slice DE-HB × maschinenbau ---
+  - {id: 311, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 01, legal_name: Maschinenbau Bremen Nord 01 GmbH, city: Bremen, postcode: "28196",
+     tag_website: https://s3-hb-mb-01-example.de, site: s3-hb-mb-01-example.de, email: info@s3-hb-mb-01-example.de,
+     expect_website: https://s3-hb-mb-01-example.de, expect_email: info@s3-hb-mb-01-example.de}
+  - {id: 312, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 02, legal_name: Maschinenbau Bremen Nord 02 GmbH, city: Bremen, postcode: "28197",
+     tag_website: https://s3-hb-mb-02-example.de, site: s3-hb-mb-02-example.de, email: info@s3-hb-mb-02-example.de,
+     expect_website: https://s3-hb-mb-02-example.de, expect_email: info@s3-hb-mb-02-example.de}
+  - {id: 313, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 03, legal_name: Maschinenbau Bremen Nord 03 GmbH, city: Bremen, postcode: "28198",
+     tag_website: https://s3-hb-mb-03-example.de, site: s3-hb-mb-03-example.de, email: info@s3-hb-mb-03-example.de,
+     expect_website: https://s3-hb-mb-03-example.de, expect_email: info@s3-hb-mb-03-example.de}
+  - {id: 314, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 04, legal_name: Maschinenbau Bremen Nord 04 GmbH, city: Bremen, postcode: "28199",
+     tag_website: https://s3-hb-mb-04-example.de, site: s3-hb-mb-04-example.de, email: info@s3-hb-mb-04-example.de,
+     expect_website: https://s3-hb-mb-04-example.de, expect_email: info@s3-hb-mb-04-example.de}
+  - {id: 315, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 05, legal_name: Maschinenbau Bremen Nord 05 GmbH, city: Bremen, postcode: "28200",
+     tag_website: https://s3-hb-mb-05-example.de, site: s3-hb-mb-05-example.de, email: info@s3-hb-mb-05-example.de,
+     expect_website: https://s3-hb-mb-05-example.de, expect_email: info@s3-hb-mb-05-example.de}
+  - {id: 316, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 06, legal_name: Maschinenbau Bremen Nord 06 GmbH, city: Bremen, postcode: "28201",
+     tag_website: https://s3-hb-mb-06-example.de, site: s3-hb-mb-06-example.de, email: info@s3-hb-mb-06-example.de,
+     expect_website: https://s3-hb-mb-06-example.de, expect_email: info@s3-hb-mb-06-example.de}
+  - {id: 317, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 07, legal_name: Maschinenbau Bremen Nord 07 GmbH, city: Bremen, postcode: "28202",
+     tag_website: https://s3-hb-mb-07-example.de, site: s3-hb-mb-07-example.de, email: info@s3-hb-mb-07-example.de,
+     expect_website: https://s3-hb-mb-07-example.de, expect_email: info@s3-hb-mb-07-example.de}
+  - {id: 318, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 08, legal_name: Maschinenbau Bremen Nord 08 GmbH, city: Bremen, postcode: "28203",
+     tag_website: https://s3-hb-mb-08-example.de, site: s3-hb-mb-08-example.de, email: info@s3-hb-mb-08-example.de,
+     expect_website: https://s3-hb-mb-08-example.de, expect_email: info@s3-hb-mb-08-example.de}
+  - {id: 319, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 09, legal_name: Maschinenbau Bremen Nord 09 GmbH, city: Bremen, postcode: "28204",
+     tag_website: https://s3-hb-mb-09-example.de, site: s3-hb-mb-09-example.de, email: info@s3-hb-mb-09-example.de,
+     expect_website: https://s3-hb-mb-09-example.de, expect_email: info@s3-hb-mb-09-example.de}
+  - {id: 320, kind: W, variant: plain, slice: [DE-HB, maschinenbau], name: Maschinenbau Bremen Nord 10, legal_name: Maschinenbau Bremen Nord 10 GmbH, city: Bremen, postcode: "28205",
+     tag_website: https://s3-hb-mb-10-example.de, site: s3-hb-mb-10-example.de, email: info@s3-hb-mb-10-example.de,
+     expect_website: https://s3-hb-mb-10-example.de, expect_email: info@s3-hb-mb-10-example.de}
+  # --- slice DE-HH × spedition ---
+  - {id: 321, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 01, legal_name: Spedition Hamburg Nord 01 GmbH, city: Hamburg, postcode: "20096",
+     tag_website: https://s3-hh-log-01-example.de, site: s3-hh-log-01-example.de, email: info@s3-hh-log-01-example.de,
+     expect_website: https://s3-hh-log-01-example.de, expect_email: info@s3-hh-log-01-example.de}
+  - {id: 322, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 02, legal_name: Spedition Hamburg Nord 02 GmbH, city: Hamburg, postcode: "20097",
+     tag_website: https://s3-hh-log-02-example.de, site: s3-hh-log-02-example.de, email: info@s3-hh-log-02-example.de,
+     expect_website: https://s3-hh-log-02-example.de, expect_email: info@s3-hh-log-02-example.de}
+  - {id: 323, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 03, legal_name: Spedition Hamburg Nord 03 GmbH, city: Hamburg, postcode: "20098",
+     tag_website: https://s3-hh-log-03-example.de, site: s3-hh-log-03-example.de, email: info@s3-hh-log-03-example.de,
+     expect_website: https://s3-hh-log-03-example.de, expect_email: info@s3-hh-log-03-example.de}
+  - {id: 324, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 04, legal_name: Spedition Hamburg Nord 04 GmbH, city: Hamburg, postcode: "20099",
+     tag_website: https://s3-hh-log-04-example.de, site: s3-hh-log-04-example.de, email: info@s3-hh-log-04-example.de,
+     expect_website: https://s3-hh-log-04-example.de, expect_email: info@s3-hh-log-04-example.de}
+  - {id: 325, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 05, legal_name: Spedition Hamburg Nord 05 GmbH, city: Hamburg, postcode: "20100",
+     tag_website: https://s3-hh-log-05-example.de, site: s3-hh-log-05-example.de, email: info@s3-hh-log-05-example.de,
+     expect_website: https://s3-hh-log-05-example.de, expect_email: info@s3-hh-log-05-example.de}
+  - {id: 326, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 06, legal_name: Spedition Hamburg Nord 06 GmbH, city: Hamburg, postcode: "20101",
+     tag_website: https://s3-hh-log-06-example.de, site: s3-hh-log-06-example.de, email: info@s3-hh-log-06-example.de,
+     expect_website: https://s3-hh-log-06-example.de, expect_email: info@s3-hh-log-06-example.de}
+  - {id: 327, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 07, legal_name: Spedition Hamburg Nord 07 GmbH, city: Hamburg, postcode: "20102",
+     tag_website: https://s3-hh-log-07-example.de, site: s3-hh-log-07-example.de, email: info@s3-hh-log-07-example.de,
+     expect_website: https://s3-hh-log-07-example.de, expect_email: info@s3-hh-log-07-example.de}
+  - {id: 328, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 08, legal_name: Spedition Hamburg Nord 08 GmbH, city: Hamburg, postcode: "20103",
+     tag_website: https://s3-hh-log-08-example.de, site: s3-hh-log-08-example.de, email: info@s3-hh-log-08-example.de,
+     expect_website: https://s3-hh-log-08-example.de, expect_email: info@s3-hh-log-08-example.de}
+  - {id: 329, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 09, legal_name: Spedition Hamburg Nord 09 GmbH, city: Hamburg, postcode: "20104",
+     tag_website: https://s3-hh-log-09-example.de, site: s3-hh-log-09-example.de, email: info@s3-hh-log-09-example.de,
+     expect_website: https://s3-hh-log-09-example.de, expect_email: info@s3-hh-log-09-example.de}
+  - {id: 330, kind: W, variant: plain, slice: [DE-HH, spedition], name: Spedition Hamburg Nord 10, legal_name: Spedition Hamburg Nord 10 GmbH, city: Hamburg, postcode: "20105",
+     tag_website: https://s3-hh-log-10-example.de, site: s3-hh-log-10-example.de, email: info@s3-hh-log-10-example.de,
+     expect_website: https://s3-hh-log-10-example.de, expect_email: info@s3-hh-log-10-example.de}
+  # --- slice DE-HH × maschinenbau ---
+  - {id: 331, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 01, legal_name: Maschinenbau Hamburg Nord 01 GmbH, city: Hamburg, postcode: "20096",
+     tag_website: https://s3-hh-mb-01-example.de, site: s3-hh-mb-01-example.de, email: info@s3-hh-mb-01-example.de,
+     expect_website: https://s3-hh-mb-01-example.de, expect_email: info@s3-hh-mb-01-example.de}
+  - {id: 332, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 02, legal_name: Maschinenbau Hamburg Nord 02 GmbH, city: Hamburg, postcode: "20097",
+     tag_website: https://s3-hh-mb-02-example.de, site: s3-hh-mb-02-example.de, email: info@s3-hh-mb-02-example.de,
+     expect_website: https://s3-hh-mb-02-example.de, expect_email: info@s3-hh-mb-02-example.de}
+  - {id: 333, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 03, legal_name: Maschinenbau Hamburg Nord 03 GmbH, city: Hamburg, postcode: "20098",
+     tag_website: https://s3-hh-mb-03-example.de, site: s3-hh-mb-03-example.de, email: info@s3-hh-mb-03-example.de,
+     expect_website: https://s3-hh-mb-03-example.de, expect_email: info@s3-hh-mb-03-example.de}
+  - {id: 334, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 04, legal_name: Maschinenbau Hamburg Nord 04 GmbH, city: Hamburg, postcode: "20099",
+     tag_website: https://s3-hh-mb-04-example.de, site: s3-hh-mb-04-example.de, email: info@s3-hh-mb-04-example.de,
+     expect_website: https://s3-hh-mb-04-example.de, expect_email: info@s3-hh-mb-04-example.de}
+  - {id: 335, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 05, legal_name: Maschinenbau Hamburg Nord 05 GmbH, city: Hamburg, postcode: "20100",
+     tag_website: https://s3-hh-mb-05-example.de, site: s3-hh-mb-05-example.de, email: info@s3-hh-mb-05-example.de,
+     expect_website: https://s3-hh-mb-05-example.de, expect_email: info@s3-hh-mb-05-example.de}
+  - {id: 336, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 06, legal_name: Maschinenbau Hamburg Nord 06 GmbH, city: Hamburg, postcode: "20101",
+     tag_website: https://s3-hh-mb-06-example.de, site: s3-hh-mb-06-example.de, email: info@s3-hh-mb-06-example.de,
+     expect_website: https://s3-hh-mb-06-example.de, expect_email: info@s3-hh-mb-06-example.de}
+  - {id: 337, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 07, legal_name: Maschinenbau Hamburg Nord 07 GmbH, city: Hamburg, postcode: "20102",
+     tag_website: https://s3-hh-mb-07-example.de, site: s3-hh-mb-07-example.de, email: info@s3-hh-mb-07-example.de,
+     expect_website: https://s3-hh-mb-07-example.de, expect_email: info@s3-hh-mb-07-example.de}
+  - {id: 338, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 08, legal_name: Maschinenbau Hamburg Nord 08 GmbH, city: Hamburg, postcode: "20103",
+     tag_website: https://s3-hh-mb-08-example.de, site: s3-hh-mb-08-example.de, email: info@s3-hh-mb-08-example.de,
+     expect_website: https://s3-hh-mb-08-example.de, expect_email: info@s3-hh-mb-08-example.de}
+  - {id: 339, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 09, legal_name: Maschinenbau Hamburg Nord 09 GmbH, city: Hamburg, postcode: "20104",
+     tag_website: https://s3-hh-mb-09-example.de, site: s3-hh-mb-09-example.de, email: info@s3-hh-mb-09-example.de,
+     expect_website: https://s3-hh-mb-09-example.de, expect_email: info@s3-hh-mb-09-example.de}
+  - {id: 340, kind: W, variant: plain, slice: [DE-HH, maschinenbau], name: Maschinenbau Hamburg Nord 10, legal_name: Maschinenbau Hamburg Nord 10 GmbH, city: Hamburg, postcode: "20105",
+     tag_website: https://s3-hh-mb-10-example.de, site: s3-hh-mb-10-example.de, email: info@s3-hh-mb-10-example.de,
+     expect_website: https://s3-hh-mb-10-example.de, expect_email: info@s3-hh-mb-10-example.de}
