@@ -69,7 +69,7 @@ def test_united_states_tier_c_block(client: TestClient) -> None:
                              "method": "catalog"}
     assert logistics["isic"] == ["49", "52", "53"] and logistics["method"] == "catalog"
     assert logistics["keywords"] == {"en": ["logistics", "freight", "forwarding", "warehouse"]}
-    assert r["sources"] == ["osm"]
+    assert r["sources"] == ["osm", "web_search"]
     assert r["known_in_job"] == 0
     assert r["compliance_note"] == ("US: Check local data protection and outreach rules before "
                                     "using the data for marketing.")
@@ -83,7 +83,7 @@ def test_germany(client: TestClient) -> None:
     assert [x["id"] for x in r["regions"]] == ["iso:DE-BY", "iso:DE-NW", "iso:DE-HE"]
     assert [x["isic"] for x in r["industries"]] == [["28"], ["49", "52", "53"], ["46"], ["C"]]
     assert [x["input"] for x in r["industries"]] == GERMANY["industries"]
-    assert r["sources"] == ["osm"] and r["warnings"] == []
+    assert r["sources"] == ["osm", "web_search"] and r["warnings"] == []
 
 
 def test_france_tier_a_register_note(client: TestClient) -> None:
@@ -91,7 +91,7 @@ def test_france_tier_a_register_note(client: TestClient) -> None:
     assert r["country"]["code"] == "FR" and r["country"]["tier"] == "A"
     assert [x["id"] for x in r["regions"]] == ["iso:FR-IDF", "iso:FR-ARA"]
     assert [x["isic"] for x in r["industries"]] == [["49"], ["46"]]
-    assert r["sources"] == ["osm"]
+    assert r["sources"] == ["osm", "web_search"]
     assert any("fr_recherche_entreprises" in w for w in r["warnings"])
 
 
@@ -154,8 +154,16 @@ def test_unresolved_industry(client: TestClient) -> None:
 
 
 def test_validation_error_still_envelope(client: TestClient) -> None:
-    resp = client.post("/scrape/resolve", json={"country": "DE", "industries": []})
+    resp = client.post("/scrape/resolve", json={"country": "DE", "information": []})
     assert resp.status_code == 422 and resp.json()["error"]["code"] == "validation_error"
+
+
+def test_industries_optional_resolves_to_all_companies(client: TestClient) -> None:
+    r = resolve(client, {"country": "DE", "regions": ["Bremen"],
+                         "information": ["company_name", "company_email", "website"]})
+    assert r["industries"] == [{"input": "", "isic": [], "scheme": "ISIC", "version": "Rev.4",
+                                "keywords": {}, "method": "any"}]
+    assert any("No industries given" in w for w in r["warnings"])
 
 
 def test_meta_countries(client: TestClient) -> None:
