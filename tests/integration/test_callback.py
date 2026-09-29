@@ -1,4 +1,4 @@
-"""Callback delivery (A§2.5, A§8, A§10.2; Q4) with respx — n8n-style internal URL allowed."""
+"""Callback delivery with respx — n8n-style internal URL allowed."""
 
 import json
 import time
@@ -37,7 +37,7 @@ def make_client(tmp_path: Path, mock: respx.MockRouter, **env: str) -> TestClien
     mock.post(OVERPASS).mock(return_value=httpx.Response(200, json={"elements": ELEMENTS}))
     mock.get(url__regex=r"https://firma-eins-example\.de/robots\.txt").mock(return_value=httpx.Response(404))
     mock.get(url__regex=r"https://firma-eins-example\.de/.*").mock(side_effect=site)
-    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS,
+    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS, "WEB_SEARCH_URL": "off",
                                     "CRAWLER_PER_DOMAIN_DELAY_S": "0", **env}))
 
     async def public(_host: str) -> list[str]:
@@ -131,7 +131,7 @@ def test_no_callback_without_url(tmp_path: Path) -> None:
 
 
 def test_callback_url_internal_host_accepted(tmp_path: Path) -> None:
-    """http://n8n:5678/... (A§10.2) is accepted by the schema and actually called (no SSRF filter)."""
+    """Http://n8n:5678/... is accepted by the schema and actually called (no SSRF filter)."""
     with respx.mock(assert_all_mocked=True) as mock:
         hook = mock.post(CALLBACK).mock(return_value=httpx.Response(200))
         with make_client(tmp_path, mock) as client:
@@ -153,7 +153,7 @@ def _slow_client(tmp_path: Path, mock: respx.MockRouter) -> TestClient:
         return httpx.Response(200, headers=HTML, text="<html/>")
 
     mock.get(url__regex=r"https://firma-eins-example\.de/.*").mock(side_effect=hang)
-    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS,
+    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS, "WEB_SEARCH_URL": "off",
                                     "CRAWLER_PER_DOMAIN_DELAY_S": "0"}))
 
     async def public(_host: str) -> list[str]:
@@ -176,7 +176,7 @@ def test_max_runtime_timeout_calls_back_once_and_counts_failed(tmp_path: Path, m
             jobs = client.app.state.jobs
             job_id = client.post("/scrape", json=BODY).json()["job_id"]
             wait_until(lambda: jobs.get(job_id).progress.get("candidates", 0) > 0)
-            monkeypatch.setattr(cleanup.C, "JOB_MAX_RUNTIME_MINUTES", 0.0)   # force the Q5 guard
+            monkeypatch.setattr(cleanup.C, "JOB_MAX_RUNTIME_MINUTES", 0.0)   # force the guard
             client.portal.call(cleanup.sweep_once, jobs, client.app.state.settings)
             wait_until(lambda: hook.called and jobs.get(job_id) is None)
             assert jobs.is_tombstoned(job_id)                                # 200 → deleted
