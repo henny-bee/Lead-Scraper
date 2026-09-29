@@ -1,4 +1,4 @@
-"""Full job lifecycle, TTL, zero-config boot and "no cross-job data" (A§2.5, A§3.3, A§8, C1, C7)."""
+"""Full job lifecycle, TTL, zero-config boot and "no cross-job data"."""
 
 import gc
 import socket
@@ -40,7 +40,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
             {"type": "node", "id": 7, "lat": 51.2, "lon": 6.8,
              "tags": {"name": "Lifecycle Firma", "website": "https://lifecycle-firma-example.de"}}]}))
         mock.get(url__regex=r"https://lifecycle-firma-example\.de/.*").mock(side_effect=site)
-        app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS,
+        app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS, "WEB_SEARCH_URL": "off",
                                         "CRAWLER_PER_DOMAIN_DELAY_S": "0", "JOB_TTL_MINUTES": "0.002"}))
 
         async def public(_host: str) -> list[str]:
@@ -64,13 +64,13 @@ def poll_until_final(client: TestClient, job_id: str) -> dict:
 
 
 def test_full_lifecycle_post_poll_get_export_delete(client: TestClient) -> None:
-    """A§3.3 flow, T28 (reads never delete): poll → final GET (repeatable) → export → DELETE."""
+    """Flow, (reads never delete): poll → final GET (repeatable) → export → DELETE."""
     jobs: JobManager = client.app.state.jobs
     job_id = client.post("/scrape", json=BODY).json()["job_id"]
     temp = Path(jobs.temp_root) / job_id
     final = poll_until_final(client, job_id)
     assert final["status"] == "success" and final["companies"][0]["company_email"] == EMAIL
-    assert client.get(f"/scrape/{job_id}").json() == final       # still readable (T28)
+    assert client.get(f"/scrape/{job_id}").json() == final       # still readable
     assert client.get(f"/scrape/{job_id}/export").status_code == 200
     assert temp.exists()
     assert client.delete(f"/scrape/{job_id}").status_code == 204
@@ -135,7 +135,7 @@ def test_no_cross_job_data_after_delivery(client: TestClient) -> None:
     final = poll_until_final(client, job_id)
     assert final["companies"][0]["company_email"] == EMAIL
     del final
-    # T28: reading keeps the job; its data goes when the client deletes it (or by TTL)
+    # reading keeps the job; its data goes when the client deletes it (or by TTL)
     assert client.delete(f"/scrape/{job_id}").status_code == 204
     # JobManager holds only a data-free tombstone
     assert jobs.jobs == {} and list(jobs.tombstones) == [job_id]
@@ -153,8 +153,8 @@ def test_no_cross_job_data_after_delivery(client: TestClient) -> None:
 
 
 def test_zero_config_boot_no_outbound_calls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Empty environment (A§9 defaults), outbound sockets blocked except loopback: the app boots,
-    is ready and resolves requests without any network call (C1)."""
+    """Empty environment, outbound sockets blocked except loopback: the app boots, is ready and
+    resolves requests without any network call."""
     real_connect = socket.socket.connect
     real_getaddrinfo = socket.getaddrinfo
     attempts: list = []
