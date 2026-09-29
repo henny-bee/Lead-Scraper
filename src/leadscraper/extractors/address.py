@@ -1,11 +1,4 @@
-"""Address & postal code (ARCHITECTURE.md §3.6; named in A§13).
-
-Postal codes are found with the country's google-i18n-address patterns
-(``CountryProfile.postal_patterns``). If a GeoNames postal dump exists at
-``data/geonames/postal/<CC>.txt`` (tab-separated, GeoNames format) the code must exist in it
-(Q12); v0.3 ships no GeoNames data, so this check is skipped by default. The address is the line
-holding the postal code (+ city) and, when it looks like a street line, the line before it.
-"""
+"""Address & postal code."""
 
 from __future__ import annotations
 
@@ -81,3 +74,33 @@ def extract_address(text: str, patterns: Sequence[re.Pattern], cc: str,
                 parts.insert(0, lines[i - 1].strip(" ,"))
             return AddressResult(", ".join(parts), code)
     return None
+
+
+# --- the company's own address ---------------------------------------------------------------------
+def _city_after(address: str, postal_code: str) -> str | None:
+    """``"Hafenstraße 1, 28195 Bremen"`` → ``"Bremen"`` (the words after the postcode, else before)."""
+    i = address.find(postal_code)
+    if i < 0:
+        return None
+    after = address[i + len(postal_code):].strip(" ,;-").split(",")[0].strip()
+    if _HAS_WORD.search(after):
+        return after
+    before = address[:i].strip(" ,;-").split(",")[-1].strip()
+    return before if _HAS_WORD.search(before) and not re.search(r"\d", before) else None
+
+
+def own_address(legal_page_texts: Sequence[str], jsonld_orgs: Sequence[object],
+                patterns: Sequence[re.Pattern], cc: str) -> tuple[str | None, str | None] | None:
+    """The company's own ``(postcode, city)``: the first:func:`extract_address` hit on the legal
+    pages (in crawl order), else the JSON-LD ``Organization`` ``postal_code``/``locality``;
+    ``None`` when neither exists."""
+    for text in legal_page_texts:
+        hit = extract_address(text, patterns, cc)
+        if hit is not None:
+            return hit.postal_code, _city_after(hit.address, hit.postal_code)
+    for org in jsonld_orgs:
+        postcode, city = getattr(org, "postal_code", None), getattr(org, "locality", None)
+        if postcode or city:
+            return postcode, city
+    return None
+
