@@ -44,7 +44,7 @@ def assert_envelope(resp, status: int, code: str | None = None) -> dict:
 
 
 def test_health_not_ready_before_startup(client: TestClient) -> None:
-    """Without the lifespan warm-up the resolver index is not ready → 503 envelope (T24)."""
+    """Without the lifespan warm-up the resolver index is not ready → 503 envelope."""
     body = assert_envelope(client.get("/health"), 503, "not_ready")
     assert body["error"]["details"]["checks"]["resolver_index"] is False
 
@@ -52,7 +52,7 @@ def test_health_not_ready_before_startup(client: TestClient) -> None:
 def test_validation_error_envelope(client: TestClient) -> None:
     body = assert_envelope(client.post("/_t/scrape", json={"country": "DE"}), 422, "validation_error")
     locs = [e["loc"] for e in body["error"]["details"]["errors"]]
-    assert ["body", "industries"] in locs and ["body", "information"] in locs
+    assert ["body", "information"] in locs and ["body", "industries"] not in locs   # industries optional
 
 
 def test_invalid_json_envelope(client: TestClient) -> None:
