@@ -21,3 +21,26 @@ fallback_paths:
   - /mentions-legales
   - /aviso-legal
   - /contact
+# `contact_markers` (PLAN v0.4 V06): a link matched by one of these words is a contact page; a match
+#   that is neither legal nor contact (e.g. "über uns", "about us") is fetched last.
+contact_markers: [kontakt, contact, contactez-nous, contacto, contactar, contatti, contattaci, contato,
+                  fale conosco]
+# `fallback_paths_by_kind` (PLAN v0.4 V06): probed per page kind and language, only for a kind that
+#   has no matching link; see ProfileBuilder.fallback_paths_for for the language order.
+fallback_paths_by_kind:
+  legal:
+    de: [/impressum]
+    en: [/imprint, /legal-notice]
+    fr: [/mentions-legales]
+    es: [/aviso-legal]
+    it: [/note-legali]
+    nl: [/colofon]
+    pt: [/aviso-legal]
+  contact:
+    de: [/kontakt]
+    en: [/contact, /contact-us]
+    fr: [/contact, /nous-contacter]
+    es: [/contacto]
+    it: [/contatti]
+    nl: [/contact]
+    pt: [/contacto, /contato]
