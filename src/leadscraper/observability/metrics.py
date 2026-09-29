@@ -1,9 +1,4 @@
-"""Prometheus metrics with the exact names/labels of ARCHITECTURE.md §11.
-
-A dedicated registry keeps the exposition limited to the service's own metrics.
-Note on naming: ``prometheus_client`` appends ``_total`` to counters, so counters are declared
-without the suffix; ``source_budget_used`` has no ``_total`` in A§11 and is therefore a Gauge.
-"""
+"""Prometheus metrics with the exact names/labels of."""
 
 from __future__ import annotations
 
@@ -43,6 +38,14 @@ SOURCE_BUDGET_USED = Gauge(
 SMTP_RESULTS = Counter(
     "smtp_results", "SMTP probe results", ["result"], registry=REGISTRY
 )  # -> smtp_results_total{result}
+WEBSITES_RESOLVED = Counter(
+    "websites_resolved", "Accepted companies by the way their website was found (PLAN v0.4 V10)",
+    ["method"], registry=REGISTRY,
+)  # -> websites_resolved_total{method}: osm_tag | email_domain | search | guess | web_discovery…
+CRAWL_JS_SHELLS = Counter(
+    "crawl_js_shells", "Crawled homepages detected as JavaScript app shells (PLAN v0.4 V15a)",
+    registry=REGISTRY,
+)  # -> crawl_js_shells_total (detection only; nothing is rendered)
 
 #: Exposed metric family names (as they appear in the exposition), for tests / docs.
 METRIC_NAMES: tuple[str, ...] = (
@@ -55,6 +58,8 @@ METRIC_NAMES: tuple[str, ...] = (
     "tiles_saturated_total",
     "source_budget_used",
     "smtp_results_total",
+    "websites_resolved_total",
+    "crawl_js_shells_total",
 )
 
 
