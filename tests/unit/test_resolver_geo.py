@@ -95,7 +95,7 @@ def test_load_aliases_normalises_and_missing_file(tmp_path: Path) -> None:
 
 
 def test_warm_up_builds_large_index() -> None:
-    assert geo.warm_up() > 30_000                      # ~36k CLDR names (A§3.2)
+    assert geo.warm_up() > 30_000                      # ~36k CLDR names
 
 
 def test_list_helpers() -> None:
