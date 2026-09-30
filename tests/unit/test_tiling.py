@@ -13,7 +13,7 @@ CAP = 60
 
 
 def make_points(seed: int = 7) -> list[tuple[float, float]]:
-    """6 000 points: three dense city clusters + rural scatter (A§3.5 simulation)."""
+    """6 000 points: three dense city clusters + rural scatter."""
     rnd = random.Random(seed)
     points: set[tuple[float, float]] = set()
     for lat, lon, n in ((48.14, 11.58, 1800), (49.45, 11.08, 1500), (48.37, 10.90, 1200)):
@@ -84,7 +84,7 @@ ALLOWED_DOMAIN_IMPORTS = {"__future__", "dataclasses", "enum", "math", "collecti
 
 
 def test_domain_does_no_io_imports() -> None:
-    """A§7: domain/ does no I/O — only pure stdlib modules and other domain modules."""
+    """Domain/ does no I/O — only pure stdlib modules and other domain modules."""
     domain = Path(__file__).resolve().parents[2] / "src" / "leadscraper" / "domain"
     files = sorted(domain.glob("*.py"))
     assert {f.name for f in files} >= {"models.py", "quota.py", "tiling.py"}
