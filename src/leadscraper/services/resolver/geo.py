@@ -1,9 +1,4 @@
-"""Country & region resolution (ARCHITECTURE.md §3.2).
-
-The block between the ``--- A§3.2 verbatim ---`` markers is the A§3.2 code, unchanged.
-Everything below it is glue: alias loading, method reporting, ``GeoArea`` construction, index
-warm-up and the optional Nominatim fallback (only when ``NOMINATIM_URL`` is set; Q7).
-"""
+"""Country & region resolution."""
 
 from __future__ import annotations
 
@@ -21,7 +16,7 @@ from leadscraper import constants as C
 from leadscraper.domain.models import GeoArea
 from leadscraper.observability.logging import get_logger
 
-# --- A§3.2 verbatim (src/leadscraper/services/resolver/geo.py, excerpt) ------------------------
+# --- verbatim (src/leadscraper/services/resolver/geo.py, excerpt) ------------------------------
 import unicodedata
 from functools import lru_cache
 
@@ -38,7 +33,8 @@ def norm(s: str) -> str:
 
 
 def _pick(q: str, choices: dict[str, str], auto: float = 90, margin: float = 5, floor: float = 70):
-    """Fuzzy match: accept automatically only if the score is high AND clearly ahead of the 2nd candidate."""
+    """Fuzzy match: accept automatically only if the score is high AND clearly ahead of the 2nd
+    candidate."""
     hits = process.extract(q, choices, scorer=fuzz.ratio, limit=3)
     if not hits:
         return None, []
@@ -84,7 +80,7 @@ def resolve_region(country: str, text: str, aliases: dict[str, str] | None = Non
         return aliases[q], []
     code, suggestions = _pick(q, {c: norm(n) for c, n in subs.items()})
     return code, suggestions   # None -> continue with GeoNames admin2/city, then Nominatim (not shown)
-# --- end of A§3.2 verbatim ----------------------------------------------------------------------
+# --- end of verbatim ----------------------------------------------------------------------------
 
 log = get_logger(__name__)
 
@@ -99,7 +95,7 @@ class Aliases:
 
 
 def load_aliases(path: Path | str = ALIASES_FILE) -> Aliases:
-    """Read ``aliases.yaml``; keys are normalised with :func:`norm`, codes upper-cased."""
+    """Read ``aliases.yaml``; keys are normalised with:func:`norm`, codes upper-cased."""
     p = Path(path)
     raw: dict[str, Any] = (yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.is_file() else {}
     countries = {norm(str(k)): str(v).upper() for k, v in (raw.get("countries") or {}).items()}
@@ -159,14 +155,14 @@ def geo_area_for_code(code: str, *, input: str = "", method: str = "exact") -> G
 
 
 def country_area(cc: str, *, input: str = "") -> GeoArea:
-    """Whole-country area used when ``regions`` is empty (A§2.1: empty = whole country)."""
+    """Whole-country area used when ``regions`` is empty."""
     c = pycountry.countries.get(alpha_2=cc)
     return GeoArea(id=f"iso:{cc}", country_code=cc, name=c.name if c else cc, level="country",
                    input=input, method="country", code=cc)
 
 
 def region_suggestion(code: str) -> dict[str, str]:
-    """``{"id": "iso:DE-BY", "name": "Bayern"}`` as in the A§2.3 error example."""
+    """``{"id": "iso:DE-BY", "name": "Bayern"}`` as in the error example."""
     return {"id": f"iso:{code}", "name": _subdivision(code).name}
 
 
@@ -207,14 +203,9 @@ def list_countries() -> list[dict[str, str]]:
                    for c in pycountry.countries), key=lambda d: d["code"])
 
 
-# --- Optional Nominatim fallback (Q7) -------------------------------------------------------------
+# --- Optional Nominatim fallback ------------------------------------------------------------------
 class NominatimClient:
-    """Last-resort region lookup; used only when ``NOMINATIM_URL`` is set.
-
-    Rate-limited to ``NOMINATIM_MAX_RPS``; bounded process-lifetime LRU cache of geodata only
-    (never job data). A hit is accepted only when the returned name matches the query closely
-    (conservative, C13) and the result is an OSM relation (needed for ``area(id:...)``, A§4).
-    """
+    """Last-resort region lookup; used only when ``NOMINATIM_URL`` is set."""
 
     ACCEPT_SCORE = C.NOMINATIM_ACCEPT_SCORE
 
