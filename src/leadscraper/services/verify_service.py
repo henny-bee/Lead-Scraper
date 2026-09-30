@@ -1,20 +1,4 @@
-"""Email verification pipeline (ARCHITECTURE.md §5.1–§5.4, §2.4).
-
-Cheapest → most expensive, stopping as soon as the outcome is certain:
-
-1. syntax (email-validator, ``check_deliverability=False``) → ``undeliverable/invalid_syntax``
-2. suppression file (addresses + domains) → ``suppressed``, nothing else checked
-3. disposable domain → ``risky/disposable`` (DNS still runs; no MX → ``undeliverable`` wins)
-4. DNS: MX, A/AAAA fallback, null MX → ``undeliverable`` (no_mx / null_mx / domain_not_found)
-5. role account / free provider → flags only
-6. optional SMTP probe (``SmtpVerifier``, only when requested **and** ``SMTP_VERIFY_ENABLED`` with
-   ``SMTP_HELO_HOST``/``SMTP_MAIL_FROM`` set) → deliverable / undeliverable / risky / unknown.
-   Requested but disabled → ``unknown/smtp_disabled`` (Q9).
-
-Without SMTP the best possible result is ``unknown`` with ``domain_has_mx: true`` (A§2.4).
-Scores come from ``config/verification.yaml``. ``cached`` is always ``false``: every cache here
-lives for one request/job only (A§5.4, C7).
-"""
+"""Email verification pipeline."""
 
 from __future__ import annotations
 
@@ -76,7 +60,7 @@ def smtp_available(settings: Settings) -> bool:
 
 
 class EmailVerifier:
-    """One instance per request / job (its DNS cache is job-scoped, C7)."""
+    """One instance per request / job."""
 
     def __init__(self, settings: Settings, *, dns: DnsChecker | None = None,
                  smtp: SmtpVerifierLike | None = None,
@@ -136,8 +120,8 @@ class EmailVerifier:
         return self._from_probe(email, probe, checks)
 
     def _from_probe(self, email: str, probe: dict, checks: dict[str, Any]) -> VerifyResult:
-        """A§5.2 table: accepted → deliverable / risky(catch_all); rejected → undeliverable;
-        temporary → unknown/greylisted (after the Q9 retries); blocked/timeout → unknown."""
+        """Table: accepted → deliverable / risky(catch_all); rejected → undeliverable; temporary →
+        unknown/greylisted; blocked/timeout → unknown."""
         status = probe.get("status")
         if probe.get("code") is not None:
             checks["smtp_code"] = probe["code"]
@@ -165,7 +149,7 @@ class EmailVerifier:
 
 def build_verifier(settings: Settings, **kwargs: Any) -> EmailVerifier:
     """Per-request/job verifier; the SMTP probe is attached only when SMTP is enabled and
-    configured (``SMTP_VERIFY_ENABLED``, ``SMTP_HELO_HOST``, ``SMTP_MAIL_FROM``; A§9)."""
+    configured."""
     from leadscraper.verification.smtp import BuiltinSmtpVerifier
 
     smtp = None
