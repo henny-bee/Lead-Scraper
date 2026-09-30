@@ -1,17 +1,4 @@
-"""In-memory job manager (ARCHITECTURE.md §2.5, §3.1, §8): ``jobs: dict[str, JobState]``.
-
-- Job ids: ``scr_``/``vrf_`` + 26-char Crockford base32 (48-bit ms timestamp + 80 random bits),
-  stdlib only (PLAN.md Q20).
-- Per-job temp dir ``TEMP_DIR/{job_id}/`` with ``crawl/``; ``candidates.jsonl`` and ``result.json``
-  are written there by the pipeline (A§8).
-- Idempotency (A§2.1): hash of the normalised body → same ``job_id`` while the job is in RAM.
-  Failed/cancelled jobs are not reused, so a client can retry (A§1 "for retry/status").
-- Delete = cancel the task if running + remove the dict entry + remove the temp dir. Deletion by
-  ``DELETE`` or callback 2xx leaves a data-free tombstone (``job_id`` → deleted_at only;
-  PLAN.md Q3/Q25). Reading a result never deletes it (PLAN.md T28).
-- Single event loop, no locks needed: every mutation below is synchronous except ``delete``,
-  which only awaits the cancelled task before touching the filesystem.
-"""
+"""In-memory job manager: ``jobs: dict[str, JobState]``."""
 
 from __future__ import annotations
 
@@ -105,11 +92,7 @@ class JobManager:
 
     # --- startup ---------------------------------------------------------------------------------
     def purge_stale_temp(self) -> int:
-        """Remove leftover job dirs from a previous process (A§8: restart = jobs lost).
-
-        Only entries that look like job ids are removed, so a mis-set ``TEMP_DIR`` (e.g. ``/tmp``)
-        cannot wipe unrelated files.
-        """
+        """Remove leftover job dirs from a previous process."""
         self.temp_root.mkdir(parents=True, exist_ok=True)
         removed = 0
         for entry in self.temp_root.iterdir():
@@ -143,7 +126,7 @@ class JobManager:
         return job, True
 
     def start(self, job: JobState, runner: Runner) -> asyncio.Task[None]:
-        """Run ``runner(job)`` as a background asyncio task in this process (A§2.5, C5)."""
+        """Run ``runner(job)`` as a background asyncio task in this process."""
         job.task = asyncio.create_task(self._run(job, runner), name=f"job:{job.job_id}")
         return job.task
 
@@ -219,7 +202,7 @@ class JobManager:
             await task
 
     async def delete(self, job_id: str, *, tombstone: bool = False) -> bool:
-        """Cancel if running, drop RAM state and temp dir. Returns False for unknown ids."""
+        """Cancel if running, drop RAM state and temp dir."""
         job = self.jobs.get(job_id)
         if job is None:
             return False
