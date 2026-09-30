@@ -1,10 +1,5 @@
-"""schema.org JSON-LD reader (ARCHITECTURE.md §3.6): ``Organization`` / ``LocalBusiness`` blocks
-carry ``email``, ``telephone``, ``legalName`` and ``address`` in the same structure in every country.
-
-Handles several ``<script type="application/ld+json">`` blocks per page, top-level lists,
-``@graph``, nested objects (e.g. ``publisher``, ``author``, ``brand``), ``@type`` lists, HTML
-comment / CDATA wrappers and invalid JSON (ignored). Pure: no I/O.
-"""
+"""Schema.org JSON-LD reader: ``Organization`` / ``LocalBusiness`` blocks carry ``email``,
+``telephone``, ``legalName`` and ``address`` in the same structure in every country."""
 
 from __future__ import annotations
 
