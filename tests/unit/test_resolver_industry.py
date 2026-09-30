@@ -72,7 +72,7 @@ def test_unresolved_returns_suggestions(cat: IndustryCatalog, text: str) -> None
 
 
 def test_handel_is_ambiguous_not_guessed(cat: IndustryCatalog) -> None:
-    """'Handel' (trade) could be wholesale or retail -> never guessed (C13)."""
+    """'Handel' (trade) could be wholesale or retail -> never guessed."""
     codes = {s["isic"] for s in cat.resolve("Handel").suggestions}
     assert codes  # suggestions exist, but nothing was auto-accepted
 
