@@ -1,1 +1,1 @@
-"""leadscraper.schemas package."""
+"""Leadscraper.schemas package."""
