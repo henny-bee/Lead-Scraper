@@ -1,8 +1,4 @@
-"""Uniform error envelope for every endpoint (ARCHITECTURE.md §2.3).
-
-``{"status": "error", "error": {"code": ..., "message": ..., "details": {...}}}`` for validation
-(422), auth (401/403), not found (404), rate limit (429) and unexpected errors (500).
-"""
+"""Uniform error envelope for every endpoint."""
 
 from __future__ import annotations
 
