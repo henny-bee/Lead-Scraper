@@ -1,22 +1,4 @@
-"""Scrape endpoints (ARCHITECTURE.md §2.1–§2.3, §2.5, §3.3).
-
-- ``POST /scrape/resolve`` — dry run (A§2.2).
-- ``POST /scrape[?wait=N]`` — input is resolved first (ambiguous input → ``422`` with suggestions,
-  A§2.1), then an in-memory job is created (idempotent while in RAM) → ``202`` ``{status, job_id,
-  poll_url}``. With ``wait`` (≤ ``WAIT_MAX_SECONDS``) the call returns ``200`` with the final body
-  if the job finishes in time.
-- ``GET /scrape/{job_id}[?offset&limit]`` — running body (+ ``resolved`` block) or the final body
-  (A§2.3). A ``failed`` job returns ``{"status":"failed","job_id","error":{…}}``.
-- ``GET /scrape/{job_id}/export?format=csv`` — CSV via stdlib; ``xlsx`` → ``422
-  unsupported_format`` (Q10).
-- ``DELETE /scrape/{job_id}`` — cancel if running + delete → ``204``; ``204`` also for tombstoned
-  ids; unknown → ``404`` (Q25).
-
-Retention (PLAN T28, user request 2026-09-25, deviation from Q3): reading a result (final GET,
-pages, ``?wait`` 200, CSV export) never deletes it, so it can be read/exported any number of times.
-A job is removed by ``DELETE``, callback 2xx, or the TTL sweeper (15 min after finishing, 30 min
-after failing).
-"""
+"""Scrape endpoints."""
 
 from __future__ import annotations
 
@@ -66,7 +48,7 @@ def running_body(job: JobState) -> dict[str, Any]:
 
 @router.post("/scrape/resolve")
 async def resolve_scrape(body: ScrapeRequest, request: Request) -> dict[str, Any]:
-    """Dry run: how the free-form input is interpreted; no scraping (A§2.2)."""
+    """Dry run: how the free-form input is interpreted; no scraping."""
     resolved = await get_resolver(request).resolve(body)
     return {"status": "success", "resolved": resolved.to_block(known_in_job=0)}
 
@@ -89,7 +71,7 @@ async def create_scrape(body: ScrapeRequest, request: Request,
         except Exception:                               # job failure is reported via its status
             pass
     if job.status is JobStatus.SUCCESS and wait:
-        return JSONResponse(final_body(job))            # T28: reading never deletes
+        return JSONResponse(final_body(job))            # reading never deletes
     if job.status is JobStatus.FAILED and wait:
         return JSONResponse(failed_body(job))
     return JSONResponse(status_code=202, content={"status": "queued" if created else job.status.value,
@@ -111,7 +93,7 @@ async def get_scrape(request: Request, job_id: str,
         return running_body(job)
     companies = list(job.result or [])
     if offset is None and limit is None:
-        return final_body(job)                                        # T28: reading never deletes
+        return final_body(job)                                        # reading never deletes
     start = offset or 0
     size = limit or C.RESULT_PAGE_LIMIT_MAX
     return {**final_body(job, companies[start:start + size]), "offset": start, "limit": size}
@@ -134,7 +116,7 @@ async def export_scrape(request: Request, job_id: str,
     writer.writeheader()
     for row in job.result or []:
         writer.writerow({k: ("" if row.get(k) is None else row.get(k)) for k in columns})
-    content = buf.getvalue()                                          # T28: export never deletes
+    content = buf.getvalue()                                          # export never deletes
     return Response(content=content, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{job_id}.csv"'})
 
