@@ -3,6 +3,7 @@ name = "leadscraper"
 version = "0.3.0"
 description = "Company Lead Scraper API - zero-config v0.3 MVP (in-memory jobs, OSM/Overpass discovery)"
 requires-python = ">=3.12"
+license = "MIT"
 # Runtime dependencies: exhaustive list per PLAN.md §2.1 + Supervisor decision block.
 dependencies = [
     "fastapi>=0.115",
