@@ -60,9 +60,8 @@ async def smtp_probe(mx_host: str, email: str, *, helo_host: str, mail_from: str
         writer.close()
 
 
-# --- below: SmtpVerifier interface (A§5.3), not part of the A§5.2 block ------------------------
-# The A§5.2 code above is verbatim. What follows wraps it behind the `SmtpVerifier` interface so a
-# second implementation (e.g. a Reacher sidecar, A§5.3) can be plugged in without other changes.
+# --- below: SmtpVerifier interface, not part of the block --------------------------------------
+# The code above is verbatim.
 from collections.abc import Awaitable, Callable  # noqa: E402
 from typing import Protocol  # noqa: E402
 
@@ -77,16 +76,7 @@ class SmtpVerifier(Protocol):
 
 
 class BuiltinSmtpVerifier:
-    """Own implementation around :func:`smtp_probe` (never sends ``DATA``).
-
-    - connects to the MX with the lowest preference; ≤ ``SMTP_MAX_CONNECTIONS_PER_MX`` parallel
-      connections per MX host (A§5.2);
-    - greylisting (4xx): with ``retry_greylist`` (async ``/verify`` jobs only, Q9) the probe is
-      repeated after ``SMTP_GREYLIST_BACKOFF_MINUTES`` (5, 15, 60); still 4xx → ``temporary``.
-      Synchronous requests make a single attempt;
-    - connection errors / timeouts → ``{"status": "timeout"}``;
-    - catch-all status is cached per domain for the lifetime of this instance (one per job, A§5.4).
-    """
+    """Own implementation around:func:`smtp_probe` (never sends ``DATA``)."""
 
     def __init__(self, *, helo_host: str, mail_from: str, port: int = C.SMTP_PORT,
                  timeout: float = C.SMTP_TIMEOUT_S,
