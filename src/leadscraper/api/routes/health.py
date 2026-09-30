@@ -1,11 +1,4 @@
-"""``GET /health`` (liveness + readiness) and ``GET /metrics`` (ARCHITECTURE.md §2.5 table, §6, §11).
-
-``/health`` is ready (``200``) only when the resolver's CLDR country index has been warmed at
-startup and ``TEMP_DIR`` is writable; otherwise ``503`` with the failing checks (uniform error
-envelope, code ``not_ready``). It makes no network call and is never authenticated or rate-limited
-(Q6), so container healthchecks can use it. ``/metrics`` serves the Prometheus exposition of the
-dedicated registry (the nine A§11 metric families); it requires the API key when one is set.
-"""
+"""``GET /health`` (liveness + readiness) and ``GET /metrics``."""
 
 from __future__ import annotations
 
