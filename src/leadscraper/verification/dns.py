@@ -1,8 +1,5 @@
-"""Step 4 — DNS (ARCHITECTURE.md §5.1): MX via dnspython async, fallback A/AAAA (implicit MX,
-RFC 5321 5.1), null-MX detection (``0 .``, RFC 7505). Results are cached **per job only** (one
-:class:`DnsChecker` per job / request; A§5.4, C7) — never across requests. The resolver is
-injectable; tests pass a fake, so no test touches the network.
-"""
+"""Step 4 — DNS: MX via dnspython async, fallback A/AAAA (implicit MX, RFC 5321 5.1), null-MX
+detection (``0.``, RFC 7505)."""
 
 from __future__ import annotations
 
