@@ -1,4 +1,4 @@
-# Company Lead Scraper API (v0.3, zero-config)
+# Company Lead Scraper API
 
 Send it a target (country, regions, optional industries, fields you want, max results). It returns
 companies with their website and email. The country, region and industry values are free text in
@@ -15,14 +15,6 @@ The pipeline:
 - **Extract and score** emails and the other requested fields.
 - **Verify** emails (optional).
 - **Deliver** the result by polling or by callback.
-
-**Zero-config:**
-- It needs no API keys, no PostgreSQL, no Redis and no paid services.
-- It runs as one container and every setting has a working default.
-- Jobs live only in RAM plus a per-job temp directory.
-- **Reading never deletes.** Results can be read and exported as often as you like. Remove a job
-  with `DELETE`, or it expires by TTL (15 min after finishing, 30 min after failing). A `2xx`
-  callback reply also deletes it.
 
 **More than one source.** Companies come from OpenStreetMap and, unless `WEB_SEARCH_URL=off`,
 from a web search per region × industry (`resolved.sources` is `["osm", "web_search"]` by
