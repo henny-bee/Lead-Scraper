@@ -1,1 +1,1 @@
-"""leadscraper.observability package."""
+"""Leadscraper.observability package."""
