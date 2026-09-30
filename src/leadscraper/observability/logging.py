@@ -1,4 +1,4 @@
-"""structlog configuration (A§6). JSON lines in prod, console renderer otherwise."""
+"""Structlog configuration."""
 
 from __future__ import annotations
 
