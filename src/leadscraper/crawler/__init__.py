@@ -1,1 +1,1 @@
-"""leadscraper.crawler package."""
+"""Leadscraper.crawler package."""
