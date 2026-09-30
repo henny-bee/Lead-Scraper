@@ -1,14 +1,4 @@
-"""TTL cleanup, runtime guard and callback-2xx deletion helper (A§2.5 "Cleanup rules", A§8, A§9).
-
-Rules applied by :func:`sweep_once` (all based on the manager's injectable clock):
-- ``success`` jobs (read or not): deleted ``JOB_TTL_MINUTES`` after they finished;
-- ``failed`` jobs: deleted ``JOB_FAILED_TTL_MINUTES`` after they failed;
-- ``cancelled`` jobs: deleted at the next sweep;
-- ``queued``/``running`` jobs are never TTL-deleted, but a job running longer than
-  ``constants.JOB_MAX_RUNTIME_MINUTES`` is cancelled and marked ``failed``/``job_timeout`` (Q5),
-  after which the failed-TTL applies;
-- tombstones (data-free, Q3) expire after ``JOB_TTL_MINUTES`` (``constants.TOMBSTONE_TTL_MINUTES``).
-"""
+"""TTL cleanup, runtime guard and callback-2xx deletion helper."""
 
 from __future__ import annotations
 
@@ -77,12 +67,11 @@ async def sweep_once(jobs: JobManager, settings: Settings) -> SweepReport:
 
 
 async def delete_after_delivery(jobs: JobManager, job_id: str) -> bool:
-    """Callback 2xx (A§2.5): delete RAM state + temp dir immediately, leaving only a data-free
-    tombstone. Since T28 (user request) reading a result via GET/export no longer deletes it."""
+    """Callback 2xx: delete RAM state + temp dir immediately, leaving only a data-free tombstone."""
     return await jobs.delete(job_id, tombstone=True)
 
 
-#: Callback ``2xx`` (A§2.5) uses the same deletion path.
+#: Callback ``2xx`` uses the same deletion path.
 on_callback_success = delete_after_delivery
 
 

@@ -1,5 +1,5 @@
-"""Step 1 — syntax & normalisation (ARCHITECTURE.md §5.1): ``email-validator`` with
-``check_deliverability=False`` (no DNS here; DNS is step 4). Pure."""
+"""Step 1 — syntax & normalisation: ``email-validator`` with ``check_deliverability=False`` (no DNS
+here; DNS is step 4)."""
 
 from __future__ import annotations
 

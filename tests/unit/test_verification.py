@@ -23,7 +23,7 @@ class MX:
 
 
 class FakeResolver:
-    """dnspython stand-in: table[(domain, rdtype)] = list | exception class."""
+    """Dnspython stand-in: table[(domain, rdtype)] = list | exception class."""
 
     def __init__(self, table: dict) -> None:
         self.table, self.calls = table, []

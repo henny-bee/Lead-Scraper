@@ -13,7 +13,14 @@ from leadscraper.services.resolver import geo
 from leadscraper.services.resolver.industry import default_catalog
 from leadscraper.services.resolver.profile import ProfileBuilder
 from leadscraper.settings import load_settings
-from leadscraper.sources.osm_overpass import OverpassAdapter, OverpassGate, SourceBudget
+from leadscraper.sources.osm_overpass import (
+    DEFAULT_OVERPASS_URL,
+    OverpassAdapter,
+    OverpassGate,
+    OverpassGatePool,
+    SourceBudget,
+    overpass_endpoints,
+)
 from leadscraper.sources.registry import build_adapters, enabled_source_names
 
 pytestmark = pytest.mark.anyio
@@ -154,7 +161,9 @@ async def test_non_retryable_error_and_bad_json() -> None:
     assert adapter.budget.used == 2 and len(adapter.outcomes) == 2
 
 
-async def test_at_most_one_request_in_flight() -> None:
+async def test_at_most_max_concurrency_in_flight() -> None:
+    """≤ ``OVERPASS_MAX_CONCURRENCY`` (2) requests per endpoint in flight."""
+    from leadscraper import constants as C
     gate = fast_gate()
 
     async def slow(request: httpx.Request) -> httpx.Response:
@@ -166,7 +175,7 @@ async def test_at_most_one_request_in_flight() -> None:
         async with httpx.AsyncClient() as client:
             adapters = [make_adapter(client, gate=gate) for _ in range(3)]  # e.g. three jobs
             await asyncio.gather(*(collect(a, make_slice(quota=q)) for q, a in enumerate(adapters, 1)))
-    assert gate.max_in_flight == 1
+    assert gate.max_in_flight <= C.OVERPASS_MAX_CONCURRENCY
 
 
 async def test_rate_limiter_spaces_requests() -> None:
@@ -201,7 +210,8 @@ async def test_daily_budget_in_process() -> None:
 
 
 async def test_registry_only_osm() -> None:
-    settings = load_settings({"GOOGLE_PLACES_ENABLED": "true", "GOOGLE_PLACES_API_KEY": "x"})
+    settings = load_settings({"GOOGLE_PLACES_ENABLED": "true", "GOOGLE_PLACES_API_KEY": "x",
+                              "WEB_SEARCH_URL": "off"})
     assert enabled_source_names(settings) == ("osm",)
     profile = ProfileBuilder().get("DE")
     adapters = build_adapters(settings, profile, gate=fast_gate(), areas={NRW.id: NRW},
@@ -211,6 +221,24 @@ async def test_registry_only_osm() -> None:
     assert osm.overpass_url == "https://overpass-api.de/api/interpreter"
     assert osm.budget.limit == 100 and osm.languages == ("de",)
     assert osm.countries is None
+
+
+async def test_registry_default_adds_web_search() -> None:
+    """Sibling of ``test_registry_only_osm``: by default (search on) the registry also enables
+    ``web_search``; its adapter is built only with a search backend and gate."""
+    from leadscraper.sources.web_search import DuckDuckGoHtml, SearchGate, WebSearchAdapter
+    settings = load_settings({"GOOGLE_PLACES_ENABLED": "true", "GOOGLE_PLACES_API_KEY": "x"})
+    assert enabled_source_names(settings) == ("osm", "web_search")
+    profile = ProfileBuilder(enabled_sources=enabled_source_names(settings)).get("DE")
+    assert profile.sources == ["osm", "web_search"]
+    kwargs = dict(gate=fast_gate(), areas={NRW.id: NRW}, industries={MANUFACTURING.id: MANUFACTURING})
+    assert [a.name for a in build_adapters(settings, profile, **kwargs)] == ["osm"]   # no backend
+    adapters = build_adapters(settings, profile, **kwargs, search_backend=DuckDuckGoHtml(),
+                              search_gate=SearchGate())
+    assert [a.name for a in adapters] == ["osm", "web_search"]
+    web = adapters[1]
+    assert isinstance(web, WebSearchAdapter) and web.country == "DE" and web.languages == ("de",)
+    assert web.budget == 20 and web.countries is None
 
 
 async def test_output_cap_is_fixed_and_independent_of_quota() -> None:
@@ -259,7 +287,7 @@ async def test_error_warning_names_the_cause() -> None:
 
 
 async def test_overpass_request_uses_long_timeout_even_on_shared_short_client() -> None:
-    """The pipeline shares the crawler client (20 s); Overpass needs > [timeout:180] (T25)."""
+    """The pipeline shares the crawler client (20 s); Overpass needs > [timeout:180]."""
     from leadscraper import constants as C
 
     with respx.mock() as mock:
@@ -268,3 +296,258 @@ async def test_overpass_request_uses_long_timeout_even_on_shared_short_client() 
             await collect(make_adapter(client), make_slice())
     timeout = route.calls[0].request.extensions["timeout"]
     assert timeout["read"] == C.OVERPASS_HTTP_TIMEOUT_S > C.OVERPASS_QUERY_TIMEOUT_S
+
+
+async def test_osm_elements_ordered_website_first() -> None:
+    """Elements are stably sorted by tier (website → email only → neither) before mapping."""
+    def el(i: int, **tags: str) -> dict:
+        return {"type": "node", "id": i, "lat": 51.0, "lon": 7.0, "tags": {"name": f"Maschinenbau {i}", **tags}}
+
+    elements = [el(1), el(2, email="a@two-example.de"), el(3, website="https://three-example.de"),
+                el(4), el(5, **{"contact:website": "five-example.de"}), el(6, **{"contact:email": "b@six-example.de"})]
+    with respx.mock(assert_all_mocked=True) as mock:
+        mock.post(URL).mock(return_value=httpx.Response(200, json={"elements": elements}))
+        async with httpx.AsyncClient() as client:
+            cands = await collect(make_adapter(client), make_slice())
+    assert [c.source_ref for c in cands] == ["node/3", "node/5", "node/2", "node/6", "node/1", "node/4"]
+
+
+# --- gate pool, 2 slots per endpoint, bounded mirror failover ----------------------------------------
+MIRROR_1 = "https://mirror-one.test/api/interpreter"
+MIRROR_2 = "https://mirror-two.test/api/interpreter"
+
+
+def pool_adapter(client: httpx.AsyncClient, endpoints=(URL, MIRROR_1, MIRROR_2), **kw) -> OverpassAdapter:
+    return make_adapter(client, gate=OverpassGatePool(endpoints, per_minute=600_000), **kw)
+
+
+def remark(n: int) -> dict:
+    return {"remark": "runtime error: Query timed out in \"query\" at line 4 after 181 seconds.",
+            "elements": [
+                {"type": "node", "id": 7000 + i, "lat": 51.0, "lon": 7.0,
+                 "tags": {"name": f"Maschinenbau Teil {i}"}} for i in range(n)]}
+
+
+def test_endpoints_mirrors_only_for_the_public_default() -> None:
+    from leadscraper import constants as C
+    assert overpass_endpoints(DEFAULT_OVERPASS_URL) == (DEFAULT_OVERPASS_URL, *C.OVERPASS_MIRROR_URLS)
+    assert overpass_endpoints("https://overpass.intern.test/api/interpreter") == (
+        "https://overpass.intern.test/api/interpreter",)
+    default_pool = OverpassGatePool.for_settings(load_settings({}))
+    assert default_pool.endpoints[0] == DEFAULT_OVERPASS_URL and len(default_pool.endpoints) == 3
+    assert default_pool.concurrency == 3 * C.OVERPASS_MAX_CONCURRENCY
+    custom = OverpassGatePool.for_settings(load_settings({"OVERPASS_URL": URL}), per_minute=600_000)
+    assert custom.endpoints == (URL,) and custom.concurrency == C.OVERPASS_MAX_CONCURRENCY
+
+
+async def test_plain_gate_is_a_single_endpoint_pool() -> None:
+    gate = fast_gate()
+    with respx.mock(assert_all_mocked=True):
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client, gate=gate)
+    assert adapter.endpoints == (URL,) and adapter.pool.gate(URL) is gate
+
+
+async def test_failover_to_mirror_on_429() -> None:
+    stamps: list[float] = []
+
+    def at(response: httpx.Response):
+        def record(_request: httpx.Request) -> httpx.Response:
+            stamps.append(asyncio.get_running_loop().time())
+            return response
+        return record
+
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as mock:
+        primary = mock.post(URL).mock(side_effect=at(httpx.Response(429)))
+        mirror = mock.post(MIRROR_1).mock(side_effect=at(httpx.Response(
+            200, json=fixture("nrw_manufacturing.json"))))
+        other = mock.post(MIRROR_2).mock(return_value=httpx.Response(500))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            adapter.retry_wait_s = 1.0                 # a backoff would be ≥ 1 s
+            s = make_slice()
+            cands = await collect(adapter, s)
+    assert primary.call_count == 1 and mirror.call_count == 1 and other.call_count == 0
+    assert len(cands) == 3 and adapter.outcomes[s].reason == "done" and adapter.budget.used == 2
+    assert stamps[1] - stamps[0] < adapter.retry_wait_s
+    mirror_timeout = mirror.calls[0].request.extensions["timeout"]
+    from leadscraper import constants as C
+    assert mirror_timeout["connect"] == C.OVERPASS_MIRROR_CONNECT_TIMEOUT_S
+    assert mirror_timeout["read"] == C.OVERPASS_HTTP_TIMEOUT_S
+
+
+async def test_failover_total_attempts_bounded() -> None:
+    with respx.mock(assert_all_mocked=True) as mock:
+        routes = [mock.post(u).mock(return_value=httpx.Response(504)) for u in (URL, MIRROR_1, MIRROR_2)]
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            s = make_slice()
+            assert await collect(adapter, s) == []
+    assert [r.call_count for r in routes] == [1, 1, 1]        # exactly 3 POSTs, one per endpoint
+    assert adapter.outcomes[s].reason == "error" and adapter.budget.used == 3
+    assert any("slice skipped" in w and "http 504 at mirror-two.test" in w for w in adapter.warnings)
+
+
+async def test_runtime_error_remark_fails_over() -> None:
+    with respx.mock(assert_all_mocked=True) as mock:
+        mock.post(URL).mock(return_value=httpx.Response(200, json=remark(1)))
+        mirror = mock.post(MIRROR_1).mock(return_value=httpx.Response(200, json=fixture("nrw_manufacturing.json")))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            s = make_slice()
+            cands = await collect(adapter, s)
+    assert mirror.call_count == 1 and len(cands) == 3
+    assert adapter.outcomes[s].reason == "done" and not adapter.warnings
+
+
+async def test_runtime_error_partial_kept_when_failover_fails() -> None:
+    with respx.mock(assert_all_mocked=True) as mock:
+        for url, n in ((URL, 2), (MIRROR_1, 5), (MIRROR_2, 3)):
+            mock.post(url).mock(return_value=httpx.Response(200, json=remark(n)))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            s = make_slice()
+            cands = await collect(adapter, s)
+    assert len(cands) == 5                                     # the best attempt's partial elements
+    assert adapter.outcomes[s].reason == "runtime_error" and adapter.budget.used == 3
+    assert any("timed out" in w and "mirror-one.test" in w for w in adapter.warnings)
+
+
+async def test_network_error_fails_over_but_single_endpoint_is_unchanged() -> None:
+    with respx.mock(assert_all_mocked=True) as mock:
+        mock.post(URL).mock(side_effect=httpx.ConnectError("refused"))
+        mock.post(MIRROR_1).mock(return_value=httpx.Response(200, json=fixture("nrw_manufacturing.json")))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            assert len(await collect(adapter, make_slice())) == 3
+    with respx.mock(assert_all_mocked=True) as mock:
+        only = mock.post(URL).mock(side_effect=httpx.ConnectError("refused"))
+        async with httpx.AsyncClient() as client:
+            single = make_adapter(client)
+            s = make_slice()
+            assert await collect(single, s) == []
+    assert only.call_count == 1 and single.outcomes[s].reason == "error"      # no retry, as in v0.3
+    assert any("(ConnectError at overpass.test)" in w and "slice skipped" in w for w in single.warnings)
+
+
+async def test_runtime_error_partial_kept_when_last_attempt_connect_error() -> None:
+    """runtime-error partial (4) → 504 → ConnectError keeps the partial."""
+    with respx.mock(assert_all_mocked=True) as mock:
+        mock.post(URL).mock(return_value=httpx.Response(200, json=remark(4)))
+        mock.post(MIRROR_1).mock(return_value=httpx.Response(504))
+        mock.post(MIRROR_2).mock(side_effect=httpx.ConnectError("refused"))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client)
+            s = make_slice()
+            cands = await collect(adapter, s)
+    assert len(cands) == 4 and adapter.outcomes[s].reason == "runtime_error"
+
+
+async def test_runtime_error_partial_kept_when_budget_runs_out() -> None:
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as mock:
+        mock.post(URL).mock(return_value=httpx.Response(200, json=remark(3)))
+        mirror = mock.post(MIRROR_1).mock(return_value=httpx.Response(200, json=remark(9)))
+        async with httpx.AsyncClient() as client:
+            adapter = pool_adapter(client, budget=1)
+            s = make_slice()
+            cands = await collect(adapter, s)
+    assert mirror.call_count == 0 and adapter.budget.used == 1
+    assert len(cands) == 3 and adapter.outcomes[s].reason == "runtime_error"
+
+
+async def test_custom_overpass_url_never_uses_mirrors() -> None:
+    from leadscraper import constants as C
+    settings = load_settings({"OVERPASS_URL": URL})
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as mock:
+        route = mock.post(URL).mock(return_value=httpx.Response(429))
+        public = [mock.post(u).mock(return_value=httpx.Response(200, json={"elements": []}))
+                  for u in (DEFAULT_OVERPASS_URL, *C.OVERPASS_MIRROR_URLS)]
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client, gate=OverpassGatePool.for_settings(settings, per_minute=600_000))
+            s = make_slice()
+            assert await collect(adapter, s) == []
+    assert route.call_count == 3 and all(r.call_count == 0 for r in public)
+    assert adapter.endpoints == (URL,) and adapter.outcomes[s].reason == "error"
+
+
+# --- area gazetteer ---------------------------------------------------------------------------------
+GAZETTEER = {"elements": [
+    {"type": "relation", "id": 1, "tags": {"boundary": "postal_code", "postal_code": "40210"}},
+    {"type": "node", "id": 2, "tags": {"place": "city", "name": "Düsseldorf"}}]}
+
+
+def gazetteer_queries(route) -> list[str]:
+    return [q for c in route.calls if '"boundary"="postal_code"' in
+            (q := parse_qs(c.request.content.decode())["data"][0])]
+
+
+async def test_gazetteer_queried_once_per_area_and_counts_toward_budget() -> None:
+    before = budget_metric()
+    with respx.mock(assert_all_mocked=True) as mock:
+        route = mock.post(URL).mock(return_value=httpx.Response(200, json=GAZETTEER))
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client)
+            first, second = await asyncio.gather(adapter.gazetteer(NRW), adapter.gazetteer(NRW))
+            third = await adapter.gazetteer(NRW)
+        queries = gazetteer_queries(route)
+    assert first is second is third and first.postcodes == {"40210"} and first.places == {"duesseldorf"}
+    assert len(queries) == 1 and 'area["ISO3166-2"="DE-NW"]' in queries[0] and "out tags;" in queries[0]
+    assert adapter.budget.used == 1 and budget_metric() == before + 1 and not adapter.warnings
+
+
+async def test_no_gazetteer_for_country_level_area() -> None:
+    germany = geo.GeoArea(id="iso:DE", country_code="DE", name="Germany", level="country")
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as mock:
+        route = mock.post(URL).mock(return_value=httpx.Response(200, json=GAZETTEER))
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client)
+            assert await adapter.gazetteer(germany) is None
+    assert route.call_count == 0 and adapter.budget.used == 0 and not adapter.warnings
+
+
+async def test_gb_eng_split_area_gets_gazetteer() -> None:
+    """Is the exact ``level == "country"``: the GB split area England (level "Country") gets its
+    gazetteer."""
+    from leadscraper.services.planner import country_split
+    uk = geo.GeoArea(id="iso:GB", country_code="GB", name="United Kingdom", level="country")
+    england = next(a for a in country_split(uk) if a.code == "GB-ENG")
+    assert england.level == "Country"
+    with respx.mock(assert_all_mocked=True) as mock:
+        route = mock.post(URL).mock(return_value=httpx.Response(200, json={"elements": [
+            {"type": "node", "id": 1, "tags": {"place": "city", "name": "Leeds"}}]}))
+        async with httpx.AsyncClient() as client:
+            gaz = await make_adapter(client).gazetteer(england)
+        queries = gazetteer_queries(route)
+    assert gaz is not None and gaz.places == {"leeds"}
+    assert len(queries) == 1 and 'area["ISO3166-2"="GB-ENG"]' in queries[0]
+
+
+async def test_gazetteer_failure_falls_back_and_warns_once() -> None:
+    """A runtime-error remark (NRW) and an HTTP error (Hessen): both give ``None`` (the caller falls
+    back to OSM postcodes and area names), one warning per job, and a failed area is not
+    re-queried."""
+    def answer(request: httpx.Request) -> httpx.Response:
+        query = parse_qs(request.content.decode())["data"][0]
+        if '"DE-NW"' in query:
+            return httpx.Response(200, json={"elements": [], "remark": "runtime error: Query timed out"})
+        return httpx.Response(400, text="bad request")
+
+    with respx.mock(assert_all_mocked=True) as mock:
+        route = mock.post(URL).mock(side_effect=answer)
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client, attempts=1)
+            assert await adapter.gazetteer(NRW) is None
+            assert await adapter.gazetteer(HESSEN) is None
+            assert await adapter.gazetteer(NRW) is None                  # cached failure
+        calls = route.call_count
+    assert calls == 2 and len(adapter.warnings) == 1
+    assert adapter.warnings[0].startswith("Overpass area gazetteer unavailable (runtime error at overpass.test)")
+
+
+async def test_gazetteer_budget_exhausted_sends_nothing() -> None:
+    with respx.mock(assert_all_mocked=True, assert_all_called=False) as mock:
+        route = mock.post(URL).mock(return_value=httpx.Response(200, json=GAZETTEER))
+        async with httpx.AsyncClient() as client:
+            adapter = make_adapter(client, budget=0)
+            assert await adapter.gazetteer(NRW) is None
+    assert route.call_count == 0 and len(adapter.warnings) == 1 and "request budget" in adapter.warnings[0]

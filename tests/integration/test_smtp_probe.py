@@ -1,5 +1,4 @@
-"""SMTP probe against a local aiosmtpd server (A§5.2, A§11). Never outbound port 25: every
-connection is asserted to go to 127.0.0.1:<random test port>."""
+"""SMTP probe against a local aiosmtpd server."""
 
 import asyncio
 import socket
@@ -107,7 +106,7 @@ async def test_valid_mailbox_deliverable(server) -> None:
     r = await make_verifier(port).verify("info@firma-probe-example.de", smtp_check=True)
     assert (r.result, r.reason, r.verification_level) == ("deliverable", "smtp_accepted", "smtp")
     assert r.checks.smtp_code == 250 and r.checks.is_catch_all is False
-    assert r.score == pytest.approx(0.93)                      # A§2.4 example: role account
+    assert r.score == pytest.approx(0.93)                      # example: role account
     assert handler.mail_from == ["bounce@verify.example.org"]
     assert handler.rcpts[0] == "info@firma-probe-example.de" and len(handler.rcpts) == 2   # + random probe
     assert not handler.data_seen
@@ -197,5 +196,5 @@ def test_smtp_module_is_a52_block_plus_interface() -> None:
     start = arch.index("``` python\n# src/leadscraper/verification/smtp.py")
     block = arch[start + len("``` python\n"):arch.index("```", start + 10)]
     src = Path(smtp.__file__).read_text(encoding="utf-8")
-    assert src.startswith(block)                                   # verbatim A§5.2
+    assert src.startswith(block)
     assert 'cmd("DATA' not in src and "DATA\\r\\n" not in src           # DATA never sent

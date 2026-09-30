@@ -1,4 +1,4 @@
-"""Optional API key (Q6) and in-process per-IP rate limiting (T23)."""
+"""Optional API key and in-process per-IP rate limiting."""
 
 from pathlib import Path
 

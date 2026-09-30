@@ -21,6 +21,10 @@ A9_ENV = (
     "CRAWLER_MAX_PAGES_PER_DOMAIN CRAWLER_MAX_RESPONSE_MB SMTP_VERIFY_ENABLED SMTP_HELO_HOST "
     "SMTP_MAIL_FROM API_KEY"
 ).split()
+#: /N2: the env contract is the block plus these additions; ``.env.example`` carries them after the
+#: values.
+V0_4_ENV_ADDITIONS = ["WEB_SEARCH_URL"]
+V0_4_ENV_DEFAULTS = {"WEB_SEARCH_URL": "https://html.duckduckgo.com/html/"}
 
 
 def _dotenv_pairs(text: str) -> dict[str, str]:
@@ -62,20 +66,20 @@ class SpyEnv(Mapping[str, str]):
 
 
 def test_env_contract_matches_a9_exactly() -> None:
-    assert list(ENV_VARS) == A9_ENV
+    assert list(ENV_VARS) == A9_ENV + V0_4_ENV_ADDITIONS
     assert set(_architecture_dotenv()) == set(A9_ENV)
 
 
 def test_env_example_equals_a9_block() -> None:
     example = _dotenv_pairs((ROOT / ".env.example").read_text(encoding="utf-8"))
-    assert example == _architecture_dotenv()
+    assert example == {**_architecture_dotenv(), **V0_4_ENV_DEFAULTS}
     assert "DATABASE_URL" not in example and "REDIS_URL" not in example
 
 
 def test_only_a9_names_are_read() -> None:
     spy = SpyEnv({"DATABASE_URL": "postgres://x", "REDIS_URL": "redis://x", "PORT": "9000"})
     s = load_settings(spy)
-    assert spy.read == set(A9_ENV)
+    assert spy.read == set(A9_ENV + V0_4_ENV_ADDITIONS)
     assert s.port == 9000
 
 
@@ -95,10 +99,11 @@ def test_defaults_with_empty_environment() -> None:
     assert s.crawler_max_response_bytes == 2 * 1024 * 1024
     assert s.smtp_verify_enabled is False and s.smtp_helo_host == "" and s.smtp_mail_from == ""
     assert s.api_key == "" and s.auth_enabled is False
+    assert s.web_search_url == "https://html.duckduckgo.com/html/"
 
 
 def test_defaults_equal_env_example_values() -> None:
-    """Loading .env.example verbatim yields the same settings as an empty environment."""
+    """Loading.env.example verbatim yields the same settings as an empty environment."""
     example = _dotenv_pairs((ROOT / ".env.example").read_text(encoding="utf-8"))
     assert load_settings(example) == load_settings({})
 
@@ -126,7 +131,7 @@ def test_constants_module_holds_limits() -> None:
     assert constants.JOB_MAX_RUNTIME_MINUTES == 120
     assert constants.SMTP_GREYLIST_BACKOFF_MINUTES == (5, 15, 60)
     assert constants.CALLBACK_TIMEOUT_S > 0
-    assert constants.OVERPASS_MAX_CONCURRENCY == 1
+    assert constants.OVERPASS_MAX_CONCURRENCY == 2          # per endpoint
     assert (constants.CONFIG_DIR / "i18n" / "contact_pages.yaml").is_file()
 
 
@@ -145,6 +150,8 @@ def test_metrics_exact_names_and_labels() -> None:
     metrics.TILES_SATURATED.labels(source="osm").inc(0)
     metrics.SOURCE_BUDGET_USED.labels(source="osm").set(0)
     metrics.SMTP_RESULTS.labels(result="unknown").inc(0)
+    metrics.WEBSITES_RESOLVED.labels(method="osm_tag").inc(0)
+    metrics.CRAWL_JS_SHELLS.inc(0)
     payload, content_type = metrics.render_latest()
     assert content_type.startswith("text/plain")
     samples = {s.name: set(s.labels) for fam in text_string_to_metric_families(payload.decode())
@@ -159,6 +166,8 @@ def test_metrics_exact_names_and_labels() -> None:
         "tiles_saturated_total": {"source"},
         "source_budget_used": {"source"},
         "smtp_results_total": {"result"},
+        "websites_resolved_total": {"method"},
+        "crawl_js_shells_total": set(),
     }
     for name, labels in expected_labels.items():
         assert name in samples, name

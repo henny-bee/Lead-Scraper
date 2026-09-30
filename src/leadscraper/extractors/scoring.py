@@ -1,19 +1,4 @@
-"""Best-email selection (ARCHITECTURE.md §3.7).
-
-All found addresses are kept per job with their ``source_url`` (``EmailFinding``); one
-``company_email`` is chosen by score. Weights, generic/special local parts and the per-country
-free-mail weight come from ``config/i18n/role_emails.yaml`` — no weights in code:
-
-- same registered domain as the website ............................ ``same_domain`` (+50)
-- generic local part of the country's languages (config order) ...... ``generic_max``…``generic_min`` (+30…+20)
-- found on the legal-notice page or in JSON-LD Organization ........ ``legal_or_jsonld`` (+10)
-- looks like ``firstname.lastname`` ................................. ``person_like`` (−10)
-- free-mail provider ................................................ ``free_mail`` (−20, per-country override)
-- special-function address (privacy/jobs/press/noreply/webmaster) .. ``special_function`` (−40)
-
-Ties keep the order in which the addresses were found. :func:`rank_emails` returns the full
-ranking so a verification step can fall back to the next-best address (Q15).
-"""
+"""Best-email selection."""
 
 from __future__ import annotations
 
@@ -100,6 +85,14 @@ def _first_word(local: str) -> str:
     return _SPLIT.split(local, maxsplit=1)[0]
 
 
+def is_special_function(email: str, config: ScoringConfig | None = None) -> bool:
+    """Special-function address (privacy/jobs/press/noreply/webmaster …): the local part or its
+    first word is in ``special_function`` (``role_emails.yaml``)."""
+    cfg = config or default_config()
+    local = email.lower().rpartition("@")[0]
+    return local in cfg.special or _first_word(local) in cfg.special
+
+
 def score_email(finding: EmailFinding, *, website_domain: str | None, languages: Sequence[str],
                 country: str, config: ScoringConfig | None = None,
                 is_free: Callable[[str], bool] | None = None) -> ScoredEmail:
@@ -112,7 +105,7 @@ def score_email(finding: EmailFinding, *, website_domain: str | None, languages:
         reasons["same_domain"] = w.get("same_domain", 0)
     order = generic_order(cfg, languages)
     head = _first_word(local)
-    special = local in cfg.special or head in cfg.special
+    special = is_special_function(finding.email, cfg)
     if not special:
         key = local if local in order else head if head in order else None
         if key is not None:
@@ -133,7 +126,7 @@ def score_email(finding: EmailFinding, *, website_domain: str | None, languages:
 def rank_emails(findings: Iterable[EmailFinding], *, website: str | None, languages: Sequence[str],
                 country: str, config: ScoringConfig | None = None,
                 is_free: Callable[[str], bool] | None = None) -> list[ScoredEmail]:
-    """All distinct addresses, best first (stable for ties). Provenance flags are OR-ed."""
+    """All distinct addresses, best first (stable for ties)."""
     merged: dict[str, EmailFinding] = {}
     for f in findings:
         key = f.email.lower()

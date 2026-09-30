@@ -124,7 +124,7 @@ async def test_delete_with_tombstone_holds_no_data(tmp_path: Path) -> None:
 
 
 async def test_delete_from_inside_own_task(tmp_path: Path) -> None:
-    """e.g. callback 2xx deletes the job from within the job's task — must not deadlock."""
+    """E.g. callback 2xx deletes the job from within the job's task — must not deadlock."""
     jm = JobManager(tmp_path)
     job, _ = jm.create("scrape", BODY)
 

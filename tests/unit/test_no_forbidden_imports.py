@@ -1,4 +1,4 @@
-"""Guards: no forbidden imports in src/ and runtime deps ⊆ PLAN §2.1 (as amended by the Supervisor)."""
+"""Guards: no forbidden imports in src/ and runtime deps ⊆."""
 
 import ast
 import re
@@ -13,7 +13,7 @@ FORBIDDEN_MODULES = {
     "taskiq", "taskiq_redis", "openai", "anthropic", "crawl4ai", "bs4", "openpyxl", "shapely",
     "pydantic_settings", "ulid", "testcontainers", "pyosmium", "osmium", "litellm",
 }
-#: PLAN §2.1 runtime list + Supervisor decision (pyyaml yes; shapely, pydantic-settings, lxml unused)
+#: runtime list (pyyaml yes; shapely, pydantic-settings, lxml unused)
 ALLOWED_RUNTIME = {
     "fastapi", "uvicorn", "pydantic", "httpx", "tenacity", "aiolimiter", "protego", "selectolax",
     "lxml", "pycountry", "babel", "rapidfuzz", "google-i18n-address", "tldextract", "phonenumbers",

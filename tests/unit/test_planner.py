@@ -58,9 +58,11 @@ async def test_reallocation_when_slice_exhausted() -> None:
 
 
 async def test_empty_regions_one_country_slice_per_industry() -> None:
+    """One slice per DE first-level subdivision (16 per industry)."""
     plan = build_plan(await resolved({**GERMANY, "regions": []}))
-    assert len(plan.ordered()) == 4
-    assert {s.area_id for s in plan.ordered()} == {"iso:DE"}
+    assert len(plan.ordered()) == 16 * 4
+    assert len({s.area_id for s in plan.ordered()}) == 16
+    assert all(s.area_id.startswith("iso:DE-") for s in plan.ordered())
     assert all(s.region_label == "" for s in plan.ordered())
 
 
@@ -82,3 +84,55 @@ def test_specificity_rankings() -> None:
     ain = geo.resolve_region_detailed("FR", "Ain").area
     assert ain.code == "FR-01"
     assert area_specificity(ain) > area_specificity(ara) > area_specificity(geo.country_area("FR"))
+
+
+# --- country-wide requests → first-level subdivision slices ------------------------------------------
+async def test_empty_regions_split_into_subdivisions_de() -> None:
+    from leadscraper.sources.osm_overpass import build_query
+    plan = build_plan(await resolved({**GERMANY, "regions": [], "industries": ["Logistik"]}))
+    slices = plan.ordered()
+    assert len(slices) == 16
+    assert [s.area_id for s in slices][0] == "iso:DE-BB" and slices[-1].area_id == "iso:DE-TH"
+    assert {"iso:DE-BW", "iso:DE-BY", "iso:DE-HB", "iso:DE-TH"} <= {s.area_id for s in slices}
+    assert all(s.region_label == "" for s in slices)
+    by = plan.areas["iso:DE-BY"]
+    assert by.code == "DE-BY" and by.level != "country" and by.method == "country"
+    query = build_query(by, plan.industries[slices[0].industry_profile_id], ("de",))
+    assert 'area["ISO3166-2"="DE-BY"]->.region;' in query
+
+
+async def test_country_with_too_many_or_no_subdivisions_keeps_country_slice() -> None:
+    import pycountry
+
+    from leadscraper.services.planner import country_split
+    plan = build_plan(await resolved({**GERMANY, "country": "United States", "regions": [],
+                                      "industries": ["Manufacturing"], "max_output": 10}))
+    assert [s.area_id for s in plan.ordered()] == ["iso:US"]            # 51 > 40 after exclusions
+    no_subs = next(c.alpha_2 for c in pycountry.countries
+                   if not pycountry.subdivisions.get(country_code=c.alpha_2))
+    assert country_split(geo.country_area(no_subs)) == []
+    assert country_split(geo.resolve_region_detailed("DE", "Bayern").area) == []   # not a country
+
+
+def test_country_split_excludes_dual_coded_territories() -> None:
+    from leadscraper.services.planner import country_split
+    nl = {a.code for a in country_split(geo.country_area("NL"))}
+    fr = {a.code for a in country_split(geo.country_area("FR"))}
+    assert len(nl) == 15 and not nl & {"NL-AW", "NL-CW", "NL-SX"}
+    assert len(fr) == 19 and not fr & {"FR-BL", "FR-MF", "FR-NC", "FR-PF", "FR-PM", "FR-TF", "FR-WF"}
+
+
+async def test_country_split_slices_per_industry_fr() -> None:
+    plan = build_plan(await resolved({**GERMANY, "country": "France", "regions": [],
+                                      "industries": ["logistique"], "max_output": 10}))
+    assert len(plan.ordered()) == 19 and all(s.region_label == "" for s in plan.ordered())
+
+
+def test_excluded_codes_are_valid() -> None:
+    import pycountry
+
+    from leadscraper import constants as C
+    assert len(C.COUNTRY_SPLIT_EXCLUDED_CODES) == 19
+    for code in C.COUNTRY_SPLIT_EXCLUDED_CODES:
+        assert pycountry.subdivisions.get(code=code) is not None, code
+        assert pycountry.countries.get(alpha_2=code.split("-")[1]) is not None, code

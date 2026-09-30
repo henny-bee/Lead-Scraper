@@ -1,4 +1,4 @@
-"""/scrape endpoints (A§2.1, A§2.3, A§2.5, A§3.3; Q3, Q10, Q25) with mocked Overpass + websites."""
+"""/scrape endpoints with mocked Overpass + websites."""
 
 import asyncio
 import time
@@ -47,7 +47,7 @@ def web() -> Iterator[respx.MockRouter]:
 
 @pytest.fixture
 def client(tmp_path: Path, web) -> Iterator[TestClient]:
-    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS,
+    app = create_app(load_settings({"TEMP_DIR": str(tmp_path / "jobs"), "OVERPASS_URL": OVERPASS, "WEB_SEARCH_URL": "off",
                                     "CRAWLER_PER_DOMAIN_DELAY_S": "0"}))
 
     async def public(_host: str) -> list[str]:
@@ -89,7 +89,7 @@ def test_running_body_contract(client: TestClient) -> None:
 
 
 def test_final_get_contract_and_repeatable_reads(client: TestClient) -> None:
-    """T28: the final GET no longer deletes — it can be read again and exported afterwards."""
+    """The final GET no longer deletes — it can be read again and exported afterwards."""
     job_id = client.post("/scrape", json=BODY).json()["job_id"]
     wait_final(client, job_id)
     temp = Path(client.app.state.jobs.temp_root) / job_id
@@ -119,7 +119,7 @@ def test_pagination_never_deletes(client: TestClient) -> None:
     assert page1["offset"] == 0 and page1["limit"] == 2
     page2 = client.get(f"/scrape/{job_id}", params={"offset": 2, "limit": 2}).json()
     assert len(page2["companies"]) == 1
-    assert client.app.state.jobs.get(job_id) is not None                  # last page: kept (T28)
+    assert client.app.state.jobs.get(job_id) is not None                  # last page: kept
     assert client.get(f"/scrape/{job_id}").status_code == 200
 
 
@@ -132,7 +132,7 @@ def test_wait_returns_final_body(client: TestClient) -> None:
 
 
 def test_new_job_does_not_delete_finished_jobs(client: TestClient) -> None:
-    """T28 (user request 2026-09-25): creating another job leaves earlier results readable."""
+    """Creating another job leaves earlier results readable."""
     jobs = client.app.state.jobs
     old_id = client.post("/scrape", json=BODY).json()["job_id"]
     wait_final(client, old_id)
@@ -164,7 +164,7 @@ def test_csv_export_and_xlsx(client: TestClient) -> None:
     lines = resp.text.strip().splitlines()
     assert lines[0] == "company_name,company_email,website,country,region,industry"
     assert len(lines) == 4 and all(line.endswith("Germany,NRW,Maschinenbau") for line in lines[1:])
-    assert client.get(f"/scrape/{job_id}").status_code == 200             # export never deletes (T28)
+    assert client.get(f"/scrape/{job_id}").status_code == 200             # export never deletes
 
 
 def test_export_of_running_job_conflict(client: TestClient) -> None:

@@ -1,15 +1,4 @@
-"""Callback delivery (ARCHITECTURE.md §2.5, §3.1 "Callback", §8, §10.2; PLAN.md Q4).
-
-When a job with ``callback_url`` finishes (``success`` or ``failed``), the same JSON body as the
-final ``GET /scrape/{job_id}`` is POSTed once (timeout ``CALLBACK_TIMEOUT_S``):
-
-- ``2xx`` → the job is deleted immediately (RAM + temp dir, data-free tombstone; A§2.5);
-- anything else / timeout / connection error → the job stays pollable until its normal TTL;
-  no retry loop (retry callback is v0.4, A§12). A callback failure never marks the job failed.
-
-Callback URLs are operator/client-trusted and may point at internal hosts such as
-``http://n8n:5678/webhook/...`` (A§10.2, Q21), so no SSRF filter applies here.
-"""
+"""Callback delivery."""
 
 from __future__ import annotations
 

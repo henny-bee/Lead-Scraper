@@ -1,11 +1,4 @@
-"""Steps 2, 3, 5 — suppression, disposable, role and free-mail lists (ARCHITECTURE.md §5.1).
-
-- Suppression: operator-managed ``config/suppression.txt`` (addresses and domains; ``#`` comments),
-  re-read when the file changes (mtime). No database table (Q2).
-- Disposable / free-mail: vendored snapshots in ``verification/data/`` (Q17, Q-E11) — static data,
-  loaded once per process; not job data (C7).
-- Role accounts: the generic and special-function local parts of ``config/i18n/role_emails.yaml``.
-"""
+"""Steps 2, 3, 5 — suppression, disposable, role and free-mail lists."""
 
 from __future__ import annotations
 
@@ -70,7 +63,8 @@ def is_role_account(local: str) -> bool:
 
 @dataclass
 class SuppressionList:
-    """Addresses and domains from the suppression file (``user@x-example.de``, ``x-example.de`` or ``@x-example.de``)."""
+    """Addresses and domains from the suppression file (``user@x-example.de``, ``x-example.de`` or
+    ``@x-example.de``)."""
 
     path: Path = C.SUPPRESSION_FILE
     addresses: frozenset[str] = frozenset()

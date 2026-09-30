@@ -1,8 +1,9 @@
 # Architecture
 
-This document describes what v0.3 actually implements. The design rationale is in
-`ARCHITECTURE.md`. Where the design was ambiguous, the decisions are recorded in `PLAN.md` §6
-(referenced below as Q*/D*/E*).
+This document describes what the service actually implements: v0.3 plus the `PLAN.md` v0.4
+"fast & fill" changes (speed, fill rate, website lookup, web-search discovery). The design
+rationale is in `ARCHITECTURE.md`. Where the design was ambiguous, the decisions are recorded in
+`PLAN.md` (referenced below as Q*/D*/E*/V*/CR*).
 
 ## 1. Principles
 
@@ -28,19 +29,25 @@ POST /scrape ──► resolve (sync; bad input → 422 before any job exists)
                    │
                    ▼  job created in RAM (scr_…), 202 returned
             ┌────────────── background asyncio task ────────────────────────────────┐
-            │ plan        region × industry slices, over-fetch 1.5× (tier A/B) or 2× (C), │
+            │ plan        region × industry slices (regions: [] → subdivisions when │
+            │             the country has 1–40), over-fetch 1.5× (A/B) or 2× (C),   │
             │             water-filling quota (domain/quota.py)                     │
-            │ discover    one Overpass query per slice → candidates.jsonl           │
+            │ discover    one Overpass query per slice, slices in parallel; one web │
+            │             search per slice alongside (web_search) → candidates.jsonl│
             │ dedup       registered domain; else name + postcode (token_set ≥ 92)  │
-            │ website     normalise OSM website tag, drop social/directory sites,   │
-            │             SSRF guard                                                 │
-            │ crawl       homepage → legal/contact links (or fallback paths),       │
-            │             robots.txt, politeness; HTML → crawl/                     │
+            │ website     OSM website tag (social/directory dropped); else lookup:  │
+            │             email domain → web search → guessed domain, each with an  │
+            │             identity check; SSRF guard                                │
+            │ crawl       homepage (www. flip) → legal/contact links, fallback per  │
+            │             missing kind, sitemap; robots.txt, politeness, site budget│
+            │             and early exit; HTML → crawl/                             │
             │ extract     emails, JSON-LD, phone, address, legal form, register,    │
             │             VAT, marketing objection (only requested fields)          │
             │ score       pick best email (config/i18n/role_emails.yaml)            │
-            │ validate    drop objections (default), suppressed addresses, and      │
-            │             low-confidence locations                                   │
+            │ validate    region check (OSM area filter, or the company's own       │
+            │             address for other sources), web-found companies' name and │
+            │             industry rules, merge with OSM; drop objections (default) │
+            │             and suppressed addresses                                  │
             │ verify      optional (verify_emails): syntax + DNS; replace or drop   │
             │             unusable emails                                           │
             │ assemble    requested fields + country/region/industry labels as sent │
@@ -60,8 +67,11 @@ flowchart LR
     API --> RES[Resolver]
     API --> JM[JobManager in RAM]
     JM --> P[Planner] --> D[Overpass adapter] --> DD[Dedup]
-    DD --> W[Website resolver + SSRF guard] --> CR[Polite crawler]
-    CR --> EX[Extractors] --> SC[Email scoring] --> V[Verification]
+    P --> WS[Web-search discovery] --> DD
+    DD --> W[Website resolver / lookup + SSRF guard] --> CR[Polite crawler]
+    W -.-> G[SearchGate: DuckDuckGo HTML / SearXNG]
+    WS -.-> G
+    CR --> EX[Extractors] --> RC[Region check / identity / merge] --> SC[Email scoring] --> V[Verification]
     V --> AS[Assemble] --> JM
     JM -->|poll / export| C
     JM -->|callback POST| C
@@ -71,17 +81,41 @@ flowchart LR
 
 Notes on behaviour:
 
-- **Discovery is streamed.** Crawling and extraction start while discovery is still running,
-  bounded by `CRAWLER_GLOBAL_CONCURRENCY`. The job stops early once `max_output` companies are
-  accepted.
-- **Quota is redistributed.** Each slice first gets an even share of the target. After all slices
-  ran, the quota is re-allocated by real capacity, so a dense slice takes over what a sparse one
-  could not fill.
+- **Discovery is streamed and parallel.** Slices run in parallel (up to the Overpass slots of all
+  endpoints). Crawling and extraction start while discovery is still running: up to
+  4 × `CRAWLER_GLOBAL_CONCURRENCY` (64) companies in flight, but only `CRAWLER_GLOBAL_CONCURRENCY`
+  (16) connections. The job stops early once `max_output` companies are accepted and cancels the
+  remaining work (including queued searches).
+- **Only candidates with a website count toward the quota.** Each slice first gets an even share
+  of the target, taken by candidates with a website (the OSM tag, or the OSM email domain). When
+  the target is not met, top-up rounds follow in this order: the surplus of other slices, then
+  web-found companies (further discovery queries only now), then the OSM companies without a
+  website, whose website is searched for or guessed. At most 10 × `max_output` candidates are
+  processed per job.
 - **Overlap rules.** A company matching several industries gets the most specific ISIC code. A
   company matching several regions gets the smallest area.
-- **Region membership comes from the Overpass `area[...]` filter** (Q13). No polygon checks,
-  no shapely.
-- **Candidates without an own website are skipped.** An email can only come from a website.
+- **Region membership** (V14a). OSM candidates are inside the area by the Overpass `area[...]`
+  filter (Q13; no polygon checks, no shapely). Any other candidate needs the company's **own**
+  address: the first address on its legal notice (footers excluded), else its JSON-LD
+  `Organization` address. Its postcode must be one of the area's postcodes (a lazy, per-job
+  Overpass area gazetteer, plus the postcodes of the job's OSM companies in that area); a
+  postcode mismatch is final. Without a postcode, the city must be a gazetteer place (or, for a
+  city-level area, the area's name). There is no bounding-box rule. A **country-level** area
+  (`regions: []` for a country that is not split) gets **no gazetteer query** and relies on the
+  OSM-candidate postcodes only. Postcodes are compared exactly after removing spaces, so a UK
+  full postcode only matches OSM-candidate postcodes, not postcode-district boundaries.
+- **Websites are looked up** (V10, V12, V13) for OSM companies without one: the OSM email's
+  domain (not free-mail), then a web search for `"<name>" <city>` (plausible result domains only),
+  then guessed domains (`name-slug.<tld>`, DNS first). A looked-up site must name the company and
+  its location; for search and guess results the location must be the site's own address.
+- **Web discovery** (V14b). One search per slice (`<industry keyword> <area name>`; the English
+  country name for a whole-country slice) runs alongside Overpass; directory and social results
+  are dropped before any crawl. A web-found company needs a legal name (legal notice or JSON-LD;
+  the search title is never used) and an industry keyword on its home or legal page. The same
+  domain as an OSM entry is one company (OSM wins); the same legal name + postcode as an OSM
+  entry is either dropped (the OSM entry has a website or a record) or merged into it after an
+  identity check.
+- **JavaScript-only homepages are counted, not rendered** (`crawl_js_shells_total`, V15a).
 - **Suppression always applies.** Addresses in `config/suppression.txt` are never returned, even
   with `verify_emails=false` (D1).
 - **`verify_emails` never adds fields to the response** (Q15). It only filters and re-ranks.
@@ -108,13 +142,17 @@ Notes on behaviour:
 | `services/resolver/industry.py` | Industry catalog (`data/isic/industries.yaml`, ISIC Rev.4) → `IndustryProfile` |
 | `services/resolver/resolve.py` | Whole request → `resolved` block or `422` |
 | `services/planner.py`, `services/dedup.py` | Slices/quota/over-fetch; deduplication and overlap rules |
-| `services/scrape_service.py` | Pipeline orchestration |
+| `services/scrape_service.py` | Pipeline orchestration (quota, top-up, website lookup, web pool, merge) |
+| `services/website_lookup.py` | Website lookup: email domain, search guesses, domain guesses |
+| `services/region_check.py` | Source-agnostic region check (rules, evidence, gazetteer types) |
 | `services/verify_service.py` | Verification pipeline and scoring (`config/verification.yaml`) |
-| `sources/base.py`, `registry.py`, `osm_overpass.py` | Adapter protocol; enabled adapters (v0.3: `osm` only); Overpass QL builder, gate, budget, retries |
+| `sources/base.py`, `registry.py`, `osm_overpass.py` | Adapter protocol; enabled adapters (`osm`, `web_search` unless `WEB_SEARCH_URL=off`); Overpass QL builder, gate pool, budget, failover, area gazetteer |
+| `sources/web_search.py` | DuckDuckGo HTML / SearXNG backends, the process-wide `SearchGate`, the discovery adapter |
 | `sources/optional/` | Empty placeholder: Google Places and register adapters are planned for v1.0 |
 | `crawler/website.py` | URL normalisation, social/directory filter, `HostGuard` SSRF check |
 | `crawler/fetcher.py`, `robots.py`, `pages.py` | Polite fetcher, robots.txt cache, legal/contact page discovery |
-| `extractors/` | `emails.py`, `jsonld.py`, `phone.py`, `address.py`, `legal.py`, `objection.py`, `scoring.py`, `text.py` |
+| `crawler/sitemap.py`, `crawler/js_shell.py` | Sitemap parsing; JavaScript app-shell detection |
+| `extractors/` | `emails.py`, `page_emails.py`, `jsonld.py`, `phone.py`, `address.py`, `legal.py`, `identity.py`, `objection.py`, `scoring.py`, `text.py` |
 | `verification/` | `syntax.py`, `dns.py`, `lists.py` (suppression, disposable, free-mail, role), `smtp.py`; vendored lists in `verification/data/` |
 | `jobs/manager.py` | In-memory `JobState` store, ids, idempotency, temp dirs, tombstones |
 | `jobs/cleanup.py` | TTL sweeper, max-runtime guard, callback-2xx deletion helper |
@@ -161,16 +199,18 @@ failed and timed-out runs remove these files. In Docker, `TEMP_DIR` is a `tmpfs`
 
 | Area | Limit | Where |
 |---|---|---|
-| Overpass | 1 request in flight per process, 10/min, 100 per job, 5000/day in-process cap; 3 attempts with exponential backoff (10–60 s) on 429/502/503/504/timeout, then the slice is marked exhausted with a warning | `constants.py` |
+| Overpass | Per endpoint: 2 requests in flight, 10/min, 5000/day in-process cap. 100 requests per job (the area gazetteer queries count too). At most 3 attempts per slice: with the public default `OVERPASS_URL` the next attempt goes to the next untried mirror (`overpass.kumi.systems`, `overpass.private.coffee`) without waiting; exponential backoff (10–60 s) only after every endpoint was tried; a `runtime error` remark fails over too, and the best partial answer is kept. Then the slice is marked exhausted with a warning naming the host. A self-hosted `OVERPASS_URL` never uses mirrors. | `constants.py` |
 | Overpass result | Capped at 5000 elements per query. A truncated slice is marked `saturated` and counted in `tiles_saturated_total`. | `constants.py` |
 | Overpass query | One query per slice. It first collects the area's named elements (`nwr(area.region)["name"]->.named;`), then applies the keyword regex (whole-word for keywords under 8 characters), the negative-keyword filter and the OSM tag filters to that set. This returns the same elements as the A§4 example shape, but the public instance answers it far faster. Server timeout `[timeout:180]`; HTTP read timeout 240 s per request. | `sources/osm_overpass.py`, `constants.py` |
-| Crawler | 1 connection per domain, `CRAWLER_PER_DOMAIN_DELAY_S` (2 s) between requests (raised to robots `Crawl-delay`, max 10 s), ≤ 5 pages per domain, bodies > 2 MB aborted, non-HTML skipped, robots.txt respected, User-Agent `CRAWLER_USER_AGENT` | env + `constants.py` |
+| Crawler | 1 connection per domain, `CRAWLER_PER_DOMAIN_DELAY_S` (2 s) between requests (raised to robots `Crawl-delay`, max 10 s), ≤ 5 page requests per domain **including fallback-path probes and sitemap fetches**, bodies > 2 MB aborted, non-HTML skipped, robots.txt respected for every host (also looked-up, guessed and `www.`-flipped ones), User-Agent `CRAWLER_USER_AGENT`. Connections: `CRAWLER_GLOBAL_CONCURRENCY` (16) per job; companies in flight: 4 × that (64). Connect 5 s / read 10 s; 45 s per site; stop after 2 consecutive network failures. **Early exit:** when only `company_name`/`company_email`/`website` are requested and `verify_emails` is off, a site's crawl stops once a legal page shows a same-domain email that is not a special-function or suppressed address. Worst-case crawl memory: 64 companies × ≤ 5 pages × ≤ 2 MB ≈ 640 MB. | env + `constants.py` |
+| Web search | 1 request in flight per process, ≥ 3 s apart, 60 per job (discovery ≤ 20), 1000/day; backend robots.txt read lazily (disallow → off for the process; unreadable → paused 15 min); HTTP 202/403/429 or a CAPTCHA page → paused 15 min; never Google/Bing; result URLs only fetched by the crawler | `constants.py`, `WEB_SEARCH_URL` |
 | API | 120 requests/min per client IP, burst 30 → `429` + `Retry-After` (not applied to `/health` and `/metrics`) | `constants.py` |
 | SMTP | Only via `/verify`, only when enabled; ≤ 2 connections per MX; never sends `DATA` | env + `constants.py` |
 
-A 12-slice request takes about 70 s for discovery alone because of the Overpass gate. This was
-accepted for v0.3 (Q-E13). A self-hosted Overpass (`OVERPASS_URL`) is still paced by the same
-gate. That is a known limitation, and there is no env var to change it.
+Overpass pacing is one query per 6 s per endpoint, so the last of 12 slices is queried after
+about 70 s (Q-E13). Crawling starts with the first answer, and the job ends as soon as
+`max_output` companies are accepted. A self-hosted Overpass (`OVERPASS_URL`) is still paced by
+the same gate. That is a known limitation, and there is no env var to change it.
 
 ## 6. SSRF guard
 
@@ -190,8 +230,11 @@ internal hosts such as `http://n8n:5678` is the intended use.
 - PostgreSQL/PostGIS, Redis/Valkey, task queues, any persistent cache or history.
 - Google Places, Companies House, commercial registers, paid geocoders, paid verification APIs,
   LLM or embedding industry mapping (all optional adapters for later versions).
-- Playwright/JS rendering. Pages that need JavaScript yield nothing (planned for v0.4).
-- Adaptive quadtree tiling. `domain/tiling.py` exists but is not wired in (v0.4).
-- Local OSM/GeoNames extracts (v0.4). City/district regions only work with `NOMINATIM_URL`.
-- Callback retries (v0.4), xlsx export, admin/suppression write endpoints.
+- Search engines other than DuckDuckGo HTML and SearXNG; Google and Bing are rejected.
+- Playwright/JS rendering. JavaScript-only homepages are detected and counted
+  (`crawl_js_shells_total`) but yield nothing; a headless fallback is deferred (V15b).
+- Challenge/CAPTCHA solving, User-Agent rotation or browser impersonation.
+- Adaptive quadtree tiling. `domain/tiling.py` exists but is not wired in.
+- Local OSM/GeoNames extracts. City/district regions only work with `NOMINATIM_URL`.
+- Callback retries, xlsx export, admin/suppression write endpoints.
 - Multi-instance or multi-worker operation: state is per process.

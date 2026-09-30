@@ -28,7 +28,7 @@ def test_remainder_distributed_and_sum_exact() -> None:
 
 
 def test_reallocation_after_slice_exhausted() -> None:
-    """Planner re-calls allocate for the remaining quota when a slice runs dry (A§3.5)."""
+    """Planner re-calls allocate for the remaining quota when a slice runs dry."""
     first = allocate(300, {"a": 1000, "b": 1000, "c": 1000})
     assert first == {"a": 100, "b": 100, "c": 100}
     # slice "a" produced only 40 -> remaining 60 goes to b and c

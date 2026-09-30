@@ -1,15 +1,8 @@
-"""CountryProfile (ARCHITECTURE.md §3.2), built for any country from open datasets.
-
-The block between the ``--- A§3.2 verbatim ---`` markers is the A§3.2 code with exactly one
-intended change (PLAN.md Q8, Supervisor): ``sources`` lists only *enabled* adapters, so the default
-is ``["osm"]``. ``tier`` is computed exactly as in A§3.2 (informational yield expectation).
-Below the block: loaders for ``config/i18n/contact_pages.yaml`` and
-``config/overrides/countries/<CC>.yaml`` (override YAML always wins).
-"""
+"""CountryProfile, built for any country from open datasets."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +10,11 @@ import yaml
 
 from leadscraper import constants as C
 
-#: Q8: adapters actually available in v0.3 (sources/registry.py, T11 may pass its own list).
+#: adapters actually available in v0.3.
 ENABLED_SOURCES: tuple[str, ...] = ("osm",)
 
 
-# --- A§3.2 verbatim (src/leadscraper/services/resolver/profile.py, excerpt) ---------------------
+# --- verbatim (src/leadscraper/services/resolver/profile.py, excerpt) ---------------------------
 import re
 from dataclasses import dataclass, field
 
@@ -52,7 +45,7 @@ def build_country_profile(cc: str, contact_words: dict[str, list[str]],
     postal = [re.compile(m.pattern.lstrip("^").rstrip("$")) for m in rules.postal_code_matchers]
     words = [w for lang in (*langs, "en") for w in contact_words.get(lang, [])]
     sources = ["google_places", "osm"] + ([OPEN_REGISTERS[cc]] if cc in OPEN_REGISTERS else [])
-    enabled = set(enabled_sources)                                  # Q8: only enabled adapters
+    enabled = set(enabled_sources)                                  # only enabled adapters
     sources = [s for s in sources if s in enabled]
     tier = "A" if cc in OPEN_REGISTERS else "B" if cc in EU_EEA | {"CH"} else "C"
     profile = CountryProfile(cc, langs, postal, list(dict.fromkeys(words)), sources, tier, overrides)
@@ -60,9 +53,10 @@ def build_country_profile(cc: str, contact_words: dict[str, list[str]],
         if hasattr(profile, key):
             setattr(profile, key, value)
     return profile
-# --- end of A§3.2 verbatim ----------------------------------------------------------------------
+# --- end of verbatim ----------------------------------------------------------------------------
 
 CONTACT_PAGES_FILE = C.CONFIG_DIR / "i18n" / "contact_pages.yaml"
+WEB_SEARCH_SOURCE = "web_search"                   # = sources.web_search.SOURCE_NAME
 COUNTRY_OVERRIDES_DIR = C.CONFIG_DIR / "overrides" / "countries"
 
 
@@ -71,6 +65,9 @@ class ContactPages:
     keywords: dict[str, list[str]]
     fallback_paths: tuple[str, ...]
     legal_markers: tuple[str, ...] = ()
+    contact_markers: tuple[str, ...] = ()
+    #: kind ("legal" | "contact") → language → paths
+    fallback_by_kind: dict[str, dict[str, tuple[str, ...]]] = field(default_factory=dict)
 
 
 def load_contact_pages(path: Path | str = CONTACT_PAGES_FILE) -> ContactPages:
@@ -79,15 +76,15 @@ def load_contact_pages(path: Path | str = CONTACT_PAGES_FILE) -> ContactPages:
                 for lang, words in (raw.get("keywords") or {}).items()}
     paths = tuple(str(p) for p in raw.get("fallback_paths") or [])
     markers = tuple(str(m).lower() for m in raw.get("legal_markers") or [])
-    return ContactPages(keywords, paths, markers)
+    contact = tuple(str(m).lower() for m in raw.get("contact_markers") or [])
+    by_kind = {str(kind): {str(lang).lower(): tuple(str(p) for p in ps or [])
+                           for lang, ps in (langs or {}).items()}
+               for kind, langs in (raw.get("fallback_paths_by_kind") or {}).items()}
+    return ContactPages(keywords, paths, markers, contact, by_kind)
 
 
 def load_country_overrides(cc: str, directory: Path | str = COUNTRY_OVERRIDES_DIR) -> dict[str, Any]:
-    """Read ``<CC>.yaml`` and coerce values to the ``CountryProfile`` field types.
-
-    ``postal_patterns`` strings are compiled, ``languages`` becomes a tuple; unknown keys (e.g.
-    ``compliance_note``) are passed through and end up in ``CountryProfile.overrides`` only.
-    """
+    """Read ``<CC>.yaml`` and coerce values to the ``CountryProfile`` field types."""
     p = Path(directory) / f"{cc.upper()}.yaml"
     if not p.is_file():
         return {}
@@ -102,7 +99,7 @@ def load_country_overrides(cc: str, directory: Path | str = COUNTRY_OVERRIDES_DI
 
 
 class ProfileBuilder:
-    """Builds and memoises CountryProfiles (static data, process lifetime — not job data, C7)."""
+    """Builds and memoises CountryProfiles."""
 
     def __init__(self, contact_pages: ContactPages | None = None,
                  overrides_dir: Path | str = COUNTRY_OVERRIDES_DIR,
@@ -115,11 +112,26 @@ class ProfileBuilder:
     def get(self, cc: str) -> CountryProfile:
         cc = cc.upper()
         if cc not in self._cache:
-            self._cache[cc] = build_country_profile(
+            profile = build_country_profile(
                 cc, self.contact_pages.keywords, load_country_overrides(cc, self.overrides_dir),
                 self.enabled_sources)
+            # keyless web-search discovery works for every country; it is added here whenever it is
+            # an enabled source
+            if WEB_SEARCH_SOURCE in self.enabled_sources and WEB_SEARCH_SOURCE not in profile.sources:
+                profile.sources.append(WEB_SEARCH_SOURCE)
+            self._cache[cc] = profile
         return self._cache[cc]
 
     @property
     def fallback_paths(self) -> tuple[str, ...]:
         return self.contact_pages.fallback_paths
+
+    def fallback_paths_for(self, languages: Sequence[str]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """``(legal, contact)`` fallback paths per kind: the country's languages in profile order,
+        then ``en``, deduplicated."""
+        out: list[tuple[str, ...]] = []
+        for kind in ("legal", "contact"):
+            table = self.contact_pages.fallback_by_kind.get(kind, {})
+            paths = [p for lang in (*languages, "en") for p in table.get(lang, ())]
+            out.append(tuple(dict.fromkeys(paths)))
+        return out[0], out[1]

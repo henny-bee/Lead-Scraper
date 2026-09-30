@@ -1,18 +1,11 @@
-"""Scrape request/response schemas (ARCHITECTURE.md §2.1, §2.3, §2.5 code block).
-
-The ``ScrapeRequest`` model follows the A§2.5 code block. Changes, all intended:
-- optional ``callback_url`` (PLAN.md Q1);
-- numeric bounds come from :mod:`leadscraper.constants` (Q19) instead of literals (same values);
-- bug fix: ``industries`` is re-checked *after* strip/dedupe, because Pydantic applies
-  ``min_length`` before the after-validator (``["  "]`` would otherwise become ``[]``).
-"""
+"""Scrape request/response schemas."""
 
 from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from leadscraper import constants as C
 
@@ -31,32 +24,30 @@ class InformationField(StrEnum):
 class ScrapeRequest(BaseModel):
     country: str = Field(min_length=2, max_length=100, examples=["Germany", "France"])
     regions: list[str] = Field(default_factory=list, max_length=C.MAX_REGIONS)  # empty = whole country
-    industries: list[str] = Field(min_length=C.MIN_INDUSTRIES, max_length=C.MAX_INDUSTRIES)
+    industries: list[str] = Field(default_factory=list, max_length=C.MAX_INDUSTRIES)  # empty = all
     information: list[InformationField] = Field(min_length=1)
     max_output: int = Field(default=C.MAX_OUTPUT_DEFAULT, ge=1, le=C.MAX_OUTPUT_UPPER)
     # --- optional, additions from the original spec ---
     verify_emails: bool = False
     freshness_days: int = Field(default=C.FRESHNESS_DAYS_DEFAULT, ge=1, le=C.FRESHNESS_DAYS_MAX)
     exclude_marketing_objections: bool = True
-    # --- PLAN.md Q1: optional webhook (A§2.5, A§8, A§10.2) ---
+    # --- optional webhook ------------------------------------
     callback_url: HttpUrl | None = None
 
     @field_validator("regions", "industries")
     @classmethod
-    def strip_and_dedupe(cls, values: list[str], info: ValidationInfo) -> list[str]:
+    def strip_and_dedupe(cls, values: list[str]) -> list[str]:
         seen: set[str] = set()
         out: list[str] = []
         for v in (s.strip() for s in values):
             if v and v.casefold() not in seen:
                 seen.add(v.casefold())
                 out.append(v)
-        if info.field_name == "industries" and len(out) < C.MIN_INDUSTRIES:
-            raise ValueError("industries must contain at least one non-empty value")
         return out
 
 
 class QueuedResponse(BaseModel):
-    """``202`` body of ``POST /scrape`` (A§2.1)."""
+    """``202`` body of ``POST /scrape``."""
 
     status: str = "queued"
     job_id: str
@@ -64,7 +55,7 @@ class QueuedResponse(BaseModel):
 
 
 class Progress(BaseModel):
-    """``progress`` block of a running job (A§2.3)."""
+    """``progress`` block of a running job."""
 
     target: int
     candidates: int = 0
@@ -73,7 +64,7 @@ class Progress(BaseModel):
 
 
 class RunningResponse(BaseModel):
-    """``GET /scrape/{job_id}`` while queued/running (A§2.3); ``resolved`` per A§2.2."""
+    """``GET /scrape/{job_id}`` while queued/running; ``resolved``."""
 
     status: str
     job_id: str
@@ -83,7 +74,7 @@ class RunningResponse(BaseModel):
 
 
 class FinalResponse(BaseModel):
-    """``GET /scrape/{job_id}`` when finished (A§2.3). Company keys depend on ``information``."""
+    """``GET /scrape/{job_id}`` when finished."""
 
     status: str
     job_id: str

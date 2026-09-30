@@ -19,7 +19,7 @@ countries:
   - {input: Qwertzuiop, expect: null, suggestions: []}
   # England: no curated alias (removed, C13 — England is GB-ENG). The unchanged A§3.2 code still
   # resolves it as an *exact* CLDR territory name: Babel locales `wae`/`wae_CH` (Walser) name GB
-  # "England". Recorded as-is, no special handling (Supervisor T07 review 2026-09-24).
+  # "England". Recorded as-is, no special handling.
   - {input: England, expect: GB, method: exact}
   - {input: England, expect: GB, method: exact, aliases: false}
 regions:

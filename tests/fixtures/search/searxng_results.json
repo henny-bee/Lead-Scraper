@@ -1,0 +1,26 @@
+{
+  "query": "kranich transporte bremen",
+  "number_of_results": 4,
+  "results": [
+    {
+      "url": "https://www.cylex.de/bremen/kranich-transporte-123.html",
+      "title": "Kranich Transporte - Cylex",
+      "content": "Branchenbuch"
+    },
+    {
+      "url": "https://kranich-transporte-example.de/",
+      "title": "Kranich Transporte GmbH",
+      "content": "Transporte und Lagerung in Bremen"
+    },
+    {
+      "url": "javascript:alert(1)",
+      "title": "bad",
+      "content": "not http"
+    },
+    {
+      "url": "https://firma-01-example.de/impressum",
+      "title": "Firma 01 GmbH",
+      "content": "Impressum"
+    }
+  ]
+}

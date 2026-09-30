@@ -1,9 +1,5 @@
-"""Contract snapshots (A§11 "Contract"): response *shapes* of /scrape (202, running, final),
-/scrape/resolve and /verify, compared with committed snapshots in tests/fixtures/contracts/.
-
-A shape keeps every key (in order) and replaces values by their JSON type, so data may change
-while the contract (A§2.1–§2.4) may not. Update a snapshot only when the spec changes.
-"""
+"""Contract snapshots: response *shapes* of /scrape (202, running, final), /scrape/resolve and
+/verify, compared with committed snapshots in tests/fixtures/contracts/."""
 
 import json
 import time
@@ -73,7 +69,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
             {"type": "node", "id": 1, "lat": 51.2, "lon": 6.8,
              "tags": {"name": "Firma Maschinenbau", "website": "https://firma-mb-example.de"}}]}))
         mock.get(url__regex=r"https://firma-mb-example\.de/.*").mock(side_effect=site)
-        app = create_app(load_settings({"TEMP_DIR": str(tmp_path), "OVERPASS_URL": OVERPASS,
+        app = create_app(load_settings({"TEMP_DIR": str(tmp_path), "OVERPASS_URL": OVERPASS, "WEB_SEARCH_URL": "off",
                                         "CRAWLER_PER_DOMAIN_DELAY_S": "0"}))
 
         async def public(_host: str) -> list[str]:

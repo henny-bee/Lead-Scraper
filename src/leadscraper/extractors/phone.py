@@ -1,8 +1,4 @@
-"""Phone extraction (ARCHITECTURE.md §3.6): ``phonenumbers`` with region = country code → E.164.
-
-Only runs when ``phone`` is requested (A§1 #7). Structured sources (JSON-LD ``telephone``, OSM
-``phone`` hint) are tried first, then page text; numbers labelled as fax are skipped.
-"""
+"""Phone extraction: ``phonenumbers`` with region = country code → E.164."""
 
 from __future__ import annotations
 

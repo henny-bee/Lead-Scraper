@@ -1,12 +1,4 @@
-"""Industry resolution (ARCHITECTURE.md §3.2 "industries" row + catalog paragraph).
-
-Cascade (stop at the first confident step): local multilingual catalog (ISIC Rev.4 codes/titles and
-curated profile aliases; ``method="catalog"``) → operator aliases from
-``config/overrides/aliases.yaml`` (``method="alias"``) → conservative fuzzy match with the same
-``_pick`` thresholds as the geo resolver (``method="fuzzy"`` + warning) → otherwise unresolved,
-with the nearest ISIC titles as suggestions (``422``). Embedding / LLM steps are not implemented
-(disabled by default, C4, Q8).
-"""
+"""Industry resolution."""
 
 from __future__ import annotations
 
@@ -96,7 +88,7 @@ class IndustryCatalog:
         self.index[key] = entry_id
 
     def _profile_for_code(self, code: str) -> str | None:
-        """A curated profile whose ISIC set is exactly this one code (e.g. ``C`` -> manufacturing)."""
+        """A curated profile whose ISIC set is exactly this one code (e.g."""
         for entry in self.entries.values():
             if entry.isic == (code,) and not entry.id.startswith("isic:"):
                 return entry.id
@@ -130,7 +122,7 @@ class IndustryCatalog:
         return IndustryResolution(text, None, self.suggest(q))
 
     def suggest(self, q: str, limit: int = SUGGESTION_LIMIT) -> tuple[dict[str, str], ...]:
-        """Nearest ISIC titles (A§3.2: 422 "with suggestions of the nearest ISIC titles")."""
+        """Nearest ISIC titles."""
         choices = {code: norm(title) for code, title in self.titles.items()}
         choices.update({f"alias:{k}": k for k in self.index})
         out: list[dict[str, str]] = []
@@ -174,8 +166,8 @@ class IndustryCatalog:
 
 
 def keywords_for(profile: IndustryProfile, languages: Iterable[str]) -> dict[str, list[str]]:
-    """Keywords restricted to the country's languages (A§2.2 shows ``{"en": [...]}`` for US);
-    falls back to English when the catalog has none of those languages."""
+    """Keywords restricted to the country's languages; falls back to English when the catalog has
+    none of those languages."""
     out = {lang: list(profile.keywords[lang]) for lang in languages if lang in profile.keywords}
     if not out and "en" in profile.keywords:
         out["en"] = list(profile.keywords["en"])

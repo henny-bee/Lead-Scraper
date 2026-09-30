@@ -1,14 +1,4 @@
-"""Optional API-key auth and in-process per-IP rate limiting (ARCHITECTURE.md §2, §2.3, §9; Q6).
-
-- ``API_KEY`` empty (default) → no authentication (A§9). Set → every endpoint except ``/health``
-  requires ``X-API-Key: <key>`` or ``Authorization: Bearer <key>``, compared with
-  ``secrets.compare_digest``; missing → ``401 unauthorized``, wrong → ``403 forbidden``.
-- Per-IP token bucket (no Redis, A§2): ``RATE_LIMIT_REQUESTS_PER_MINUTE`` refill with
-  ``RATE_LIMIT_BURST`` capacity → ``429 rate_limited`` + ``Retry-After``. State is bounded: idle
-  IPs are evicted after ``RATE_LIMIT_IDLE_EVICT_S`` and at most ``RATE_LIMIT_MAX_TRACKED_IPS`` are
-  tracked (least recently seen dropped first). The client IP is the socket peer address; proxy
-  headers are not trusted (run behind a proxy → configure the proxy's own limits).
-"""
+"""Optional API-key auth and in-process per-IP rate limiting."""
 
 from __future__ import annotations
 
@@ -39,7 +29,7 @@ def _presented_key(request: Request) -> str | None:
 async def require_api_key(request: Request) -> None:
     expected: str = request.app.state.settings.api_key
     if not expected:
-        return                                           # zero-config: auth off (A§9)
+        return                                           # zero-config: auth off
     presented = _presented_key(request)
     if presented is None:
         raise ApiError(401, "unauthorized", "API key required (X-API-Key or Authorization: Bearer)",

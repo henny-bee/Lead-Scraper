@@ -1,0 +1,234 @@
+# Benchmark scenario S1 (PLAN.md V00 step 1, CR12). S2 = S1 with max_output=60 (tests/benchmark/scenario.py).
+# Synthetic data only: every company domain is *-example.de. The only real domains are the free-mail
+# providers of the F elements (gmx.de, web.de; never contacted) and the directory links of the mocked
+# search results (gelbeseiten.de; filtered before any crawl, never contacted).
+#
+# One Overpass slice (Bremen × Logistik), 46 Overpass elements in this order: N×16, F×2, W×24, E×4,
+# plus K×6 web-only companies that are NOT in OSM (only in the mocked discovery SERP).
+#   N  name + addr:postcode + addr:city, no website
+#      variant guess  → the domain guessed from the name resolves (V13)
+#      variant search → only the mocked lookup search finds it (SERP = directory link + company site; V12)
+#      variant decoy  → search/guess lead to a same-name site with another postcode + city → must be rejected
+#   F  free-mail `email` tag only → never a website (VQ9)
+#   W  `website` tag; `variant` = how the email appears on the site
+#   E  company-domain `email` tag only; the site exists and its Impressum matches name + postcode (V10)
+#   K  web-only (V14b): 3 recoverable (in-area legal address in the gazetteer, legal name, industry
+#      keywords); 3 decoys (out-of-area legal postcode; postcode only in a footer branch list;
+#      non-industry site)
+# Ground truth: expect_website / expect_email (null = nothing correct can be returned for it);
+# `decoy: true` marks the 6 sites that must never be accepted.
+# addr:postcode defaults to 28195 + 2 × (position − 1), addr:city to Bremen (scenario.py).
+#
+# Recoverable (correct email + website), CR12:
+#   default (search on) 42 = 22 W (24 − 2 noemail) + 4 E + 5 guess + 8 search + 3 K
+#   off (WEB_SEARCH_URL=off) 31 = 22 W + 4 E + 5 guess
+# Decoys: 6 (3 lookup decoys among N, 3 web decoys among K).
+name: S1
+request:
+  country: Germany
+  regions: [Bremen]
+  industries: [Logistik]
+  information: [company_name, company_email, website]
+  max_output: 20
+env:
+  CRAWLER_PER_DOMAIN_DELAY_S: "0.2"
+site_latency_s: 0.02
+overpass_latency_s: 0.2
+recoverable: {default: 42, "off": 31}
+decoys: 6
+elements:
+  # --- N ×16 (no website) --------------------------------------------------------------------
+  - {id: 1, kind: N, variant: guess, name: Spedition Weserbogen Example, legal_name: Spedition Weserbogen Example GmbH,
+     site: spedition-weserbogen-example.de, email: info@spedition-weserbogen-example.de,
+     expect_website: https://spedition-weserbogen-example.de, expect_email: info@spedition-weserbogen-example.de}
+  - {id: 2, kind: N, variant: search, search: true, name: Kranich Transporte, legal_name: Kranich Transporte GmbH,
+     site: kranich-transporte-example.de, email: info@kranich-transporte-example.de,
+     expect_website: https://kranich-transporte-example.de, expect_email: info@kranich-transporte-example.de}
+  - {id: 3, kind: N, variant: search, search: true, name: Möwenflug Kurierdienst, legal_name: Möwenflug Kurierdienst GmbH,
+     site: moewenflug-kurier-example.de, email: kontakt@moewenflug-kurier-example.de,
+     expect_website: https://moewenflug-kurier-example.de, expect_email: kontakt@moewenflug-kurier-example.de}
+  - {id: 4, kind: N, variant: decoy, search: true, decoy_site: true, name: Spedition Möwe Example,
+     legal_name: Spedition Möwe Example GmbH, site: spedition-moewe-example.de, email: info@spedition-moewe-example.de,
+     decoy: {street: Isarweg 1, postcode: "80331", city: München}, expect_website: null, expect_email: null}
+  - {id: 5, kind: N, variant: guess, name: Spedition Förde Example, legal_name: Spedition Förde Example GmbH,
+     site: spedition-foerde-example.de, email: kontakt@spedition-foerde-example.de,
+     expect_website: https://spedition-foerde-example.de, expect_email: kontakt@spedition-foerde-example.de}
+  - {id: 6, kind: N, variant: search, search: true, name: Hanse Frachtkontor, legal_name: Hanse Frachtkontor GmbH & Co. KG,
+     site: hanse-frachtkontor-example.de, email: info@hanse-frachtkontor-example.de,
+     expect_website: https://hanse-frachtkontor-example.de, expect_email: info@hanse-frachtkontor-example.de}
+  - {id: 7, kind: N, variant: search, search: true, name: Nordlicht Umzüge, legal_name: Nordlicht Umzüge GmbH,
+     site: nordlicht-umzuege-example.de, email: office@nordlicht-umzuege-example.de,
+     expect_website: https://nordlicht-umzuege-example.de, expect_email: office@nordlicht-umzuege-example.de}
+  - {id: 8, kind: N, variant: guess, name: Spedition Kogge Example, legal_name: Spedition Kogge Example KG,
+     site: spedition-kogge-example.de, email: info@spedition-kogge-example.de,
+     expect_website: https://spedition-kogge-example.de, expect_email: info@spedition-kogge-example.de}
+  - {id: 9, kind: N, variant: decoy, search: true, decoy_site: true, name: Spedition Leuchtturm Example,
+     legal_name: Spedition Leuchtturm Example GmbH, site: spedition-leuchtturm-example.de,
+     email: info@spedition-leuchtturm-example.de,
+     decoy: {street: Elbchaussee 9, postcode: "22765", city: Hamburg},
+     branches: "Niederlassungen: Hamburg, Bremen, Kiel", expect_website: null, expect_email: null}
+  - {id: 10, kind: N, variant: search, search: true, name: Tidenhub Cargo, legal_name: Tidenhub Cargo GmbH,
+     site: tidenhub-cargo-example.de, email: info@tidenhub-cargo-example.de,
+     expect_website: https://tidenhub-cargo-example.de, expect_email: info@tidenhub-cargo-example.de}
+  - {id: 11, kind: N, variant: search, search: true, name: Seewind Distribution, legal_name: Seewind Distribution GmbH,
+     site: seewind-distribution-example.de, email: vertrieb@seewind-distribution-example.de,
+     expect_website: https://seewind-distribution-example.de, expect_email: vertrieb@seewind-distribution-example.de}
+  - {id: 12, kind: N, variant: guess, name: Spedition Lüttje Example, legal_name: Spedition Lüttje Example GmbH,
+     site: spedition-luettje-example.de, email: info@spedition-luettje-example.de,
+     expect_website: https://spedition-luettje-example.de, expect_email: info@spedition-luettje-example.de}
+  - {id: 13, kind: N, variant: search, search: true, name: Kaje Lagerhaus, legal_name: Kaje Lagerhaus GmbH,
+     site: kaje-lagerhaus-example.de, email: info@kaje-lagerhaus-example.de,
+     expect_website: https://kaje-lagerhaus-example.de, expect_email: info@kaje-lagerhaus-example.de}
+  - {id: 14, kind: N, variant: decoy, search: true, decoy_site: true, name: Spedition Hafenkante Example,
+     legal_name: Spedition Hafenkante Example GmbH, site: spedition-hafenkante-example.de,
+     email: info@spedition-hafenkante-example.de,
+     decoy: {street: Rheinufer 4, postcode: "50667", city: Köln}, expect_website: null, expect_email: null}
+  - {id: 15, kind: N, variant: guess, name: Spedition Deichgraf Example, legal_name: Spedition Deichgraf Example GmbH,
+     site: spedition-deichgraf-example.de, email: disposition@spedition-deichgraf-example.de,
+     expect_website: https://spedition-deichgraf-example.de, expect_email: disposition@spedition-deichgraf-example.de}
+  - {id: 16, kind: N, variant: search, search: true, name: Findorff Express, legal_name: Findorff Express GmbH,
+     site: findorff-express-example.de, email: info@findorff-express-example.de,
+     expect_website: https://findorff-express-example.de, expect_email: info@findorff-express-example.de}
+  # --- F ×2 (free-mail email tag only) ---------------------------------------------------------
+  - {id: 17, kind: F, name: Kurierdienst Tjark, tag_email: kurier.tjark@gmx.de, expect_website: null, expect_email: null}
+  - {id: 18, kind: F, name: Kleintransporte Butjadingen, tag_email: butjadingen.transporte@web.de,
+     expect_website: null, expect_email: null}
+  # --- W ×24 (website tag) ------------------------------------------------------------------------
+  - {id: 19, kind: W, variant: plain, name: Anker Logistik, legal_name: Anker Logistik GmbH,
+     tag_website: https://anker-logistik-example.de, site: anker-logistik-example.de, email: info@anker-logistik-example.de,
+     expect_website: https://anker-logistik-example.de, expect_email: info@anker-logistik-example.de}
+  - {id: 20, kind: W, variant: inline_b, name: Boje Logistik, legal_name: Boje Logistik GmbH,
+     tag_website: https://boje-logistik-example.de, site: boje-logistik-example.de, email: info@boje-logistik-example.de,
+     expect_website: https://boje-logistik-example.de, expect_email: info@boje-logistik-example.de}
+  - {id: 21, kind: W, variant: plain, name: Deich Logistik, legal_name: Deich Logistik GmbH,
+     tag_website: https://deich-logistik-example.de, site: deich-logistik-example.de, email: kontakt@deich-logistik-example.de,
+     expect_website: https://deich-logistik-example.de, expect_email: kontakt@deich-logistik-example.de}
+  - {id: 22, kind: W, variant: cf_attr, name: Ebbe Logistik, legal_name: Ebbe Logistik GmbH,
+     tag_website: https://ebbe-logistik-example.de, site: ebbe-logistik-example.de, email: info@ebbe-logistik-example.de,
+     expect_website: https://ebbe-logistik-example.de, expect_email: info@ebbe-logistik-example.de}
+  - {id: 23, kind: W, variant: plain, name: Flut Logistik, legal_name: Flut Logistik GmbH,
+     tag_website: https://flut-logistik-example.de, site: flut-logistik-example.de, email: office@flut-logistik-example.de,
+     expect_website: https://flut-logistik-example.de, expect_email: office@flut-logistik-example.de}
+  - {id: 24, kind: W, variant: fullwidth, name: Gezeiten Logistik, legal_name: Gezeiten Logistik GmbH,
+     tag_website: https://gezeiten-logistik-example.de, site: gezeiten-logistik-example.de,
+     email: info@gezeiten-logistik-example.de,
+     expect_website: https://gezeiten-logistik-example.de, expect_email: info@gezeiten-logistik-example.de}
+  - {id: 25, kind: W, variant: plain, name: Heck Logistik, legal_name: Heck Logistik GmbH,
+     tag_website: https://heck-logistik-example.de, site: heck-logistik-example.de, email: info@heck-logistik-example.de,
+     expect_website: https://heck-logistik-example.de, expect_email: info@heck-logistik-example.de}
+  - {id: 26, kind: W, variant: kontakt_unlinked, name: Insel Logistik, legal_name: Insel Logistik GmbH,
+     tag_website: https://insel-logistik-example.de, site: insel-logistik-example.de, email: info@insel-logistik-example.de,
+     expect_website: https://insel-logistik-example.de, expect_email: info@insel-logistik-example.de}
+  - {id: 27, kind: W, variant: plain, name: Jolle Logistik, legal_name: Jolle Logistik GmbH,
+     tag_website: https://jolle-logistik-example.de, site: jolle-logistik-example.de, email: info@jolle-logistik-example.de,
+     expect_website: https://jolle-logistik-example.de, expect_email: info@jolle-logistik-example.de}
+  - {id: 28, kind: W, variant: sitemap, name: Kajüte Logistik, legal_name: Kajüte Logistik GmbH,
+     tag_website: https://kajuete-logistik-example.de, site: kajuete-logistik-example.de,
+     email: info@kajuete-logistik-example.de,
+     expect_website: https://kajuete-logistik-example.de, expect_email: info@kajuete-logistik-example.de}
+  - {id: 29, kind: W, variant: plain, name: Lotse Logistik, legal_name: Lotse Logistik GmbH,
+     tag_website: https://lotse-logistik-example.de, site: lotse-logistik-example.de, email: info@lotse-logistik-example.de,
+     expect_website: https://lotse-logistik-example.de, expect_email: info@lotse-logistik-example.de}
+  # bare domain in the tag; only www. resolves
+  - {id: 30, kind: W, variant: plain, name: Mast Logistik, legal_name: Mast Logistik GmbH,
+     tag_website: mast-logistik-example.de, site: www.mast-logistik-example.de, email: info@mast-logistik-example.de,
+     expect_website: https://www.mast-logistik-example.de, expect_email: info@mast-logistik-example.de}
+  - {id: 31, kind: W, variant: plain, name: Nebel Logistik, legal_name: Nebel Logistik GmbH,
+     tag_website: https://nebel-logistik-example.de, site: nebel-logistik-example.de, email: service@nebel-logistik-example.de,
+     expect_website: https://nebel-logistik-example.de, expect_email: service@nebel-logistik-example.de}
+  # placeholder mustermann@ (form hint) + the real address; on the old ranking the placeholder wins the tie
+  - {id: 32, kind: W, variant: placeholder, name: Ostwind Logistik, legal_name: Ostwind Logistik GmbH,
+     tag_website: https://ostwind-logistik-example.de, site: ostwind-logistik-example.de,
+     email: planung@ostwind-logistik-example.de,
+     expect_website: https://ostwind-logistik-example.de, expect_email: planung@ostwind-logistik-example.de}
+  - {id: 33, kind: W, variant: plain, name: Pier Logistik, legal_name: Pier Logistik GmbH,
+     tag_website: https://pier-logistik-example.de, site: pier-logistik-example.de, email: info@pier-logistik-example.de,
+     expect_website: https://pier-logistik-example.de, expect_email: info@pier-logistik-example.de}
+  - {id: 34, kind: W, variant: inline_span, name: Quai Logistik, legal_name: Quai Logistik GmbH,
+     tag_website: https://quai-logistik-example.de, site: quai-logistik-example.de, email: info@quai-logistik-example.de,
+     expect_website: https://quai-logistik-example.de, expect_email: info@quai-logistik-example.de}
+  - {id: 35, kind: W, variant: plain, name: Reling Logistik, legal_name: Reling Logistik GmbH,
+     tag_website: https://reling-logistik-example.de, site: reling-logistik-example.de, email: info@reling-logistik-example.de,
+     expect_website: https://reling-logistik-example.de, expect_email: info@reling-logistik-example.de}
+  - {id: 36, kind: W, variant: cf_href, name: Segel Logistik, legal_name: Segel Logistik GmbH,
+     tag_website: https://segel-logistik-example.de, site: segel-logistik-example.de, email: kontakt@segel-logistik-example.de,
+     expect_website: https://segel-logistik-example.de, expect_email: kontakt@segel-logistik-example.de}
+  - {id: 37, kind: W, variant: at, name: Tampen Logistik, legal_name: Tampen Logistik GmbH,
+     tag_website: https://tampen-logistik-example.de, site: tampen-logistik-example.de, email: info@tampen-logistik-example.de,
+     expect_website: https://tampen-logistik-example.de, expect_email: info@tampen-logistik-example.de}
+  - {id: 38, kind: W, variant: kontakt_unlinked, name: Ufer Logistik, legal_name: Ufer Logistik GmbH,
+     tag_website: https://ufer-logistik-example.de, site: ufer-logistik-example.de, email: kontakt@ufer-logistik-example.de,
+     expect_website: https://ufer-logistik-example.de, expect_email: kontakt@ufer-logistik-example.de}
+  - {id: 39, kind: W, variant: inline_split, name: Vorsteven Logistik, legal_name: Vorsteven Logistik GmbH,
+     tag_website: https://vorsteven-logistik-example.de, site: vorsteven-logistik-example.de,
+     email: info@vorsteven-logistik-example.de,
+     expect_website: https://vorsteven-logistik-example.de, expect_email: info@vorsteven-logistik-example.de}
+  - {id: 40, kind: W, variant: noemail, name: Want Logistik, legal_name: Want Logistik GmbH,
+     tag_website: https://want-logistik-example.de, site: want-logistik-example.de,
+     expect_website: https://want-logistik-example.de, expect_email: null}
+  - {id: 41, kind: W, variant: noemail, name: Yacht Logistik, legal_name: Yacht Logistik GmbH,
+     tag_website: https://yacht-logistik-example.de, site: yacht-logistik-example.de,
+     expect_website: https://yacht-logistik-example.de, expect_email: null}
+  - {id: 42, kind: W, variant: plain, name: Zollhaus Logistik, legal_name: Zollhaus Logistik GmbH,
+     tag_website: https://zollhaus-logistik-example.de, site: zollhaus-logistik-example.de,
+     email: info@zollhaus-logistik-example.de,
+     expect_website: https://zollhaus-logistik-example.de, expect_email: info@zollhaus-logistik-example.de}
+  # --- E ×4 (company-domain email tag only) ---------------------------------------------------------
+  - {id: 43, kind: E, variant: email_tag, name: Holm Logistik, legal_name: Holm Logistik GmbH,
+     tag_email: info@holm-logistik-example.de, site: holm-logistik-example.de, email: info@holm-logistik-example.de,
+     expect_website: https://holm-logistik-example.de, expect_email: info@holm-logistik-example.de}
+  - {id: 44, kind: E, variant: email_tag, name: Kuttersteg Spedition, legal_name: Kuttersteg Spedition GmbH,
+     tag_email: kontakt@kuttersteg-spedition-example.de, site: kuttersteg-spedition-example.de,
+     email: kontakt@kuttersteg-spedition-example.de,
+     expect_website: https://kuttersteg-spedition-example.de, expect_email: kontakt@kuttersteg-spedition-example.de}
+  - {id: 45, kind: E, variant: email_tag, name: Priel Logistik, legal_name: Priel Logistik KG,
+     tag_email: info@priel-logistik-example.de, site: priel-logistik-example.de, email: info@priel-logistik-example.de,
+     expect_website: https://priel-logistik-example.de, expect_email: info@priel-logistik-example.de}
+  - {id: 46, kind: E, variant: email_tag, name: Watt Transport, legal_name: Watt Transport GmbH,
+     tag_email: office@watt-transport-example.de, site: watt-transport-example.de, email: office@watt-transport-example.de,
+     expect_website: https://watt-transport-example.de, expect_email: office@watt-transport-example.de}
+  # --- K ×6 (web-only, not in OSM; found only via the discovery SERP) ------------------------------
+  - {id: 47, kind: K, variant: plain, name: Wesertal Spedition, legal_name: Wesertal Spedition GmbH,
+     postcode: "28307", site: wesertal-spedition-example.de, email: info@wesertal-spedition-example.de,
+     expect_website: https://wesertal-spedition-example.de, expect_email: info@wesertal-spedition-example.de}
+  - {id: 48, kind: K, variant: plain, name: Rolandsped Logistik, legal_name: Rolandsped Logistik GmbH,
+     postcode: "28325", site: rolandsped-logistik-example.de, email: kontakt@rolandsped-logistik-example.de,
+     expect_website: https://rolandsped-logistik-example.de, expect_email: kontakt@rolandsped-logistik-example.de}
+  - {id: 49, kind: K, variant: plain, name: Schlachte Transporte, legal_name: Schlachte Transporte KG,
+     postcode: "28357", site: schlachte-transporte-example.de, email: info@schlachte-transporte-example.de,
+     expect_website: https://schlachte-transporte-example.de, expect_email: info@schlachte-transporte-example.de}
+  # decoy: legal address out of area (Oldenburg; not in the gazetteer), city "Bremen" only in the slogan
+  - {id: 50, kind: K, variant: plain, decoy_site: true, name: Huntetal Spedition, legal_name: Huntetal Spedition GmbH,
+     postcode: "26123", city: Oldenburg, site: huntetal-spedition-example.de, email: info@huntetal-spedition-example.de,
+     slogan: Touren täglich nach Bremen und Hamburg., expect_website: null, expect_email: null}
+  # decoy: no own address on the legal page; in-area postcodes only in a footer branch list
+  - {id: 51, kind: K, variant: footer_only, decoy_site: true, name: Nordwest Cargo Netz, legal_name: Nordwest Cargo Netz GmbH,
+     postcode: "", site: nordwest-cargo-netz-example.de, email: info@nordwest-cargo-netz-example.de,
+     footer: "Unsere Standorte: 28195 Bremen · 20095 Hamburg · 30159 Hannover", expect_website: null, expect_email: null}
+  # decoy: in-area legal address but not a logistics company (no industry keyword on its pages)
+  - {id: 52, kind: K, variant: non_industry, decoy_site: true, name: Blumenhaus Sonnenschein,
+     legal_name: Blumenhaus Sonnenschein GmbH, postcode: "28359", site: blumenhaus-sonnenschein-example.de,
+     email: info@blumenhaus-sonnenschein-example.de, expect_website: null, expect_email: null}
+
+# Mocked DuckDuckGo discovery SERP (V14b), returned for every slice query that is not a company-name
+# lookup. Besides the 6 K sites it lists a directory URL (must never be crawled), the domain of W 19
+# (must merge by domain) and the site of search-findable N 2 (must merge by legal name + postcode).
+discovery_serp:
+  - {url: "https://www.gelbeseiten.de/branchen/spedition/bremen", title: Speditionen in Bremen - Gelbe Seiten}
+  - {element: 47}
+  - {url: "https://anker-logistik-example.de/", title: Anker Logistik GmbH - Transporte ab Bremen}
+  - {element: 50}
+  - {element: 48}
+  - {element: 51}
+  - {url: "https://kranich-transporte-example.de/", title: Kranich Transporte Bremen}
+  - {element: 52}
+  - {element: 49}
+
+# Gazetteer mock (V14a/CR10): answer to the per-area query recognised by boundary"="postal_code".
+# Includes the 3 recoverable K postcodes; excludes the out-of-area decoy's (26123).
+gazetteer:
+  DE-HB:
+    postcodes: ["28195", "28197", "28199", "28201", "28203", "28205", "28207", "28209", "28211", "28213",
+                "28215", "28217", "28219", "28237", "28239", "28259", "28277", "28279", "28307", "28309",
+                "28325", "28327", "28329", "28355", "28357", "28359", "28717", "28719", "28755", "28757"]
+    places: [Bremen, Findorff, Vegesack, Blumenthal, Hemelingen, Osterholz, Horn-Lehe, Walle]

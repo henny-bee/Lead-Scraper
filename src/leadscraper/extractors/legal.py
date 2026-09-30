@@ -1,18 +1,4 @@
-"""Legal name & form, register number, VAT id (ARCHITECTURE.md §3.6 table; T16).
-
-- Legal forms per country from ``config/i18n/legal_forms.yaml``: suffix forms (``GmbH``, ``SAS``,
-  ``Ltd``, ``B.V.``) and prefix forms (a form placed before the name, supported for countries whose YAML entry defines ``prefix``).
-- Register numbers (PLAN Q-E12): per-country ``register_pattern`` from the same file, validated
-  with the configured python-stdnum module (``de.handelsregisternummer``, ``fr.siren``,
-  ``no.orgnr``). DE: when stdnum confirms court + number the normalised form is returned
-  (``München HRB 123456``); otherwise the raw value is returned **only** because it matched the
-  strict pattern ``HRA|HRB|GnR|PR|VR`` + digits (Handelsregister numbers have no checksum, stdnum
-  mostly checks the court name). FR SIREN / NO orgnr failing the checksum → ``None``.
-- VAT ids: EU-style prefixed numbers validated with ``stdnum.eu.vat``; otherwise a VAT keyword
-  (USt-IdNr, VAT, TVA, IVA, BTW, …) followed by a number validated with the country's
-  stdnum ``vat`` module. Only format validity is checked, never existence (A§13).
-Pure functions, no I/O except reading the YAML once.
-"""
+"""Legal name & form, register number, VAT id."""
 
 from __future__ import annotations
 
@@ -132,8 +118,7 @@ def _canonical_form(found: str, forms: Sequence[str]) -> str:
 
 def extract_legal_name(texts: Iterable[str], cc: str, *, candidates: Iterable[str] = (),
                        source_name: str | None = None) -> LegalName | None:
-    """Best legal name: structured candidates (JSON-LD legalName/name, source name) and page lines.
-    Prefers the match most similar to the source name, else the first match (legal page first)."""
+    """Best legal name: structured candidates (JSON-LD legalName/name, source name) and page lines."""
     found: list[LegalName] = []
     for value in candidates:
         if value and (hit := parse_legal_name(value, cc)):

@@ -187,3 +187,20 @@ async def test_redirect_loop_limited() -> None:
     assert res.skipped == SKIP_REDIRECTS
     assert route.call_count == MAX_REDIRECTS + 1 + 5              # + second fetcher: page limit 5
     assert limited.skipped == SKIP_PAGE_LIMIT                     # default page cap bounds it first
+
+
+# --- unresolvable hosts are recorded ------------------------------------------------------------------
+@pytest.mark.anyio
+async def test_host_guard_records_unresolvable_hosts() -> None:
+    async def resolve(host: str) -> list[str]:
+        if host == "weg-example.de":
+            raise OSError("NXDOMAIN")
+        if host == "leer-example.de":
+            return []
+        return ["10.0.0.1"] if host == "intern-example.de" else ["93.184.216.34"]
+
+    guard = HostGuard(resolve)
+    assert not await guard.is_public("weg-example.de") and not await guard.is_public("leer-example.de")
+    assert not await guard.is_public("intern-example.de")           # private: rejected, but resolvable
+    assert await guard.is_public("www.weg-example.de")
+    assert guard.unresolvable == {"weg-example.de", "leer-example.de"}

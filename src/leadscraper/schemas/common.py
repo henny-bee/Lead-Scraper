@@ -1,4 +1,4 @@
-"""Shared schemas: the uniform error envelope (ARCHITECTURE.md §2.3)."""
+"""Shared schemas: the uniform error envelope."""
 
 from __future__ import annotations
 

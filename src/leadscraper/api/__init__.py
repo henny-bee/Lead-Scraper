@@ -1,1 +1,1 @@
-"""leadscraper.api package."""
+"""Leadscraper.api package."""

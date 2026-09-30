@@ -1,1 +1,1 @@
-"""leadscraper.domain package."""
+"""Leadscraper.domain package."""

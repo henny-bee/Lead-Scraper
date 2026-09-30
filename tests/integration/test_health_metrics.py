@@ -1,4 +1,4 @@
-"""/health readiness and /metrics exposition (A§2.5 table, A§11; T24)."""
+"""/health readiness and /metrics exposition."""
 
 from pathlib import Path
 

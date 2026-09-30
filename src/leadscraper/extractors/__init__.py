@@ -1,1 +1,1 @@
-"""leadscraper.extractors package."""
+"""Leadscraper.extractors package."""

@@ -1,5 +1,5 @@
-"""Autocomplete endpoints (ARCHITECTURE.md §2.5 table): ``GET /meta/countries``,
-``GET /meta/regions?country=DE``, ``GET /meta/industries?q=logistik``. Local data only."""
+"""Autocomplete endpoints: ``GET /meta/countries``, ``GET /meta/regions?country=DE``, ``GET
+/meta/industries?q=logistik``."""
 
 from __future__ import annotations
 

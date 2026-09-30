@@ -92,7 +92,7 @@ def test_51_becomes_async_job_and_repeatable_read(client: TestClient) -> None:
     assert final["status"] == "success" and final["job_id"] == job_id and final["count"] == 51
     assert all(set(r) == A24_RESULT_KEYS for r in final["results"])
     jobs = client.app.state.jobs
-    assert client.get(f"/verify/{job_id}").json() == final                   # T28: repeatable read
+    assert client.get(f"/verify/{job_id}").json() == final                   # repeatable read
     assert client.get(f"/verify/{job_id}").status_code == 200
     assert jobs.get(job_id) is not None and (Path(jobs.temp_root) / job_id).exists()
 

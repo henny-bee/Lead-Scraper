@@ -1,24 +1,11 @@
-"""Polite HTTP fetcher (ARCHITECTURE.md §3.6, §9 crawler vars, §11 crawl metrics).
-
-- ``User-Agent`` = ``CRAWLER_USER_AGENT``; global concurrency ``CRAWLER_GLOBAL_CONCURRENCY``.
-- One connection per (registered) domain at a time, and ``CRAWLER_PER_DOMAIN_DELAY_S`` between the
-  end of one request and the start of the next (raised to a robots.txt ``Crawl-delay`` up to
-  ``ROBOTS_MAX_CRAWL_DELAY_S``).
-- At most ``CRAWLER_MAX_PAGES_PER_DOMAIN`` page requests per domain and job (robots.txt excluded).
-- Bodies are streamed: > ``CRAWLER_MAX_RESPONSE_MB`` (declared or actual) → aborted; non-HTML →
-  skipped without reading the body.
-- Redirects are followed manually; every hop is normalised and SSRF-checked (Q21) and, when a
-  robots checker is attached, checked against robots.txt.
-- ``crawl_requests_total{status_code}`` and ``crawl_duration_seconds`` are recorded per request.
-All state is per job (one Fetcher per job, C7).
-"""
+"""Polite HTTP fetcher."""
 
 from __future__ import annotations
 
 import asyncio
 import time
 from collections import defaultdict
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
@@ -63,10 +50,21 @@ class FetchResult:
         return self.skipped is None and self.html is not None
 
 
+def accept_language(languages: Sequence[str], country_code: str) -> str:
+    """``Accept-Language`` from the country's languages, e.g."""
+    langs = list(dict.fromkeys(lang.lower() for lang in languages if lang)) or ["en"]
+    parts = [f"{langs[0]}-{country_code.upper()}", langs[0]]
+    parts += [lang for lang in langs[1:]] + ([] if "en" in langs else ["en"])
+    q = [1.0] + [round(max(0.1, 0.9 - 0.1 * i), 1) for i in range(len(parts) - 1)]
+    return ",".join(p if w == 1.0 else f"{p};q={w}" for p, w in zip(parts, q))
+
+
 class Fetcher:
     def __init__(self, settings: Settings, client: httpx.AsyncClient, guard: HostGuard, *,
-                 clock: Clock = time.monotonic, sleep: Sleep = asyncio.sleep) -> None:
+                 clock: Clock = time.monotonic, sleep: Sleep = asyncio.sleep,
+                 accept_language: str | None = None) -> None:
         self.user_agent = settings.crawler_user_agent
+        self.accept_language = accept_language            # (None = no header)
         self.delay_s = settings.crawler_per_domain_delay_s
         self.max_pages = settings.crawler_max_pages_per_domain
         self.max_bytes = settings.crawler_max_response_bytes
@@ -78,6 +76,8 @@ class Fetcher:
         self.pages: dict[str, int] = defaultdict(int)
         self.domain_delay: dict[str, float] = {}
         self.robots: RobotsCheck | None = None
+        #: robots.txt ``Sitemap:`` URLs of a site
+        self.sitemaps: Callable[[Website], Awaitable[list[str]]] | None = None
         self.unreachable_origins: set[str] = set()   # robots.txt fetch failed at network level
 
     def set_crawl_delay(self, domain: str, seconds: float | None) -> None:
@@ -88,7 +88,9 @@ class Fetcher:
         return max(0, self.max_pages - self.pages[domain])
 
     async def fetch(self, url: str | Website, *, count_page: bool = True,
-                    html_only: bool = True, max_bytes: int | None = None) -> FetchResult:
+                    html_only: bool = True, max_bytes: int | None = None,
+                    timeout: httpx.Timeout | None = None) -> FetchResult:
+        """``timeout`` overrides the client's timeout for this request and its redirect hops."""
         try:
             site = url if isinstance(url, Website) else normalize_website(url)
         except WebsiteRejected as exc:
@@ -105,7 +107,7 @@ class Fetcher:
                     result.skipped = SKIP_ROBOTS
                     return result
             location = await self._request(site, result, count_page=count_page,
-                                           html_only=html_only, max_bytes=max_bytes)
+                                           html_only=html_only, max_bytes=max_bytes, timeout=timeout)
             if location is None:
                 return result
             try:
@@ -117,10 +119,15 @@ class Fetcher:
         return result
 
     async def _request(self, site: Website, result: FetchResult, *, count_page: bool,
-                       html_only: bool, max_bytes: int | None) -> str | None:
+                       html_only: bool, max_bytes: int | None,
+                       timeout: httpx.Timeout | None = None) -> str | None:
         """One polite GET. Returns the redirect target, or None when ``result`` is final."""
         domain = site.registered_domain
         limit = max_bytes or self.max_bytes
+        headers = {"User-Agent": self.user_agent,
+                   "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1"}
+        if self.accept_language:
+            headers["Accept-Language"] = self.accept_language
         async with self._locks[domain]:
             if count_page and self.pages[domain] >= self.max_pages:   # checked under the lock
                 result.skipped = SKIP_PAGE_LIMIT
@@ -135,9 +142,8 @@ class Fetcher:
             try:
                 async with self._global:
                     async with self.client.stream(
-                            "GET", site.url, follow_redirects=False,
-                            headers={"User-Agent": self.user_agent,
-                                     "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1"},
+                            "GET", site.url, follow_redirects=False, headers=headers,
+                            timeout=timeout if timeout is not None else httpx.USE_CLIENT_DEFAULT,
                     ) as resp:
                         label = str(resp.status_code)
                         result.status = resp.status_code

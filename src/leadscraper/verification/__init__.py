@@ -1,1 +1,1 @@
-"""leadscraper.verification package."""
+"""Leadscraper.verification package."""

@@ -1,1 +1,1 @@
-"""leadscraper.jobs package."""
+"""Leadscraper.jobs package."""

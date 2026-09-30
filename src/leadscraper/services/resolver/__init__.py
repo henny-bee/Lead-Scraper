@@ -1,1 +1,1 @@
-"""leadscraper.services.resolver package."""
+"""Leadscraper.services.resolver package."""

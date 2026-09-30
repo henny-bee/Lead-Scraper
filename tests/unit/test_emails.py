@@ -45,7 +45,7 @@ def test_positive_cases(html: str, expected: set[str]) -> None:
 
 
 def test_percent_encoded_mailto() -> None:
-    """Q-E9 fix: EMAIL_RE no longer matches the raw text after '%69'; only the unquoted mailto."""
+    """Fix: EMAIL_RE no longer matches the raw text after '%69'; only the unquoted mailto."""
     assert extract_emails('<a href="mailto:%69nfo@firma-example.de">x</a>') == {"info@firma-example.de"}
     assert extract_emails("Mail: info@firma-example.de") == {"info@firma-example.de"}
 
@@ -93,7 +93,7 @@ def test_module_is_architecture_block_with_q_e9_fix() -> None:
     arch = (root / "ARCHITECTURE.md").read_text(encoding="utf-8")
     start = arch.index("``` python\n# src/leadscraper/extractors/emails.py")
     block = arch[start + len("``` python\n"):arch.index("```", start + 10)]
-    # Exactly one approved deviation (PLAN Q-E9): "%" added to the EMAIL_RE lookbehind + comment.
+    # Exactly one approved deviation: "%" added to the EMAIL_RE lookbehind + comment.
     old = r'EMAIL_RE = re.compile(r"(?<![\w.+-])'
     new = r'EMAIL_RE = re.compile(r"(?<![\w.+%-])'
     assert block.count(old) == 1

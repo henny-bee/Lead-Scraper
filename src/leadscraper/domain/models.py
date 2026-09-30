@@ -1,4 +1,4 @@
-"""Pure domain models (no I/O). ``SearchSlice`` and ``CompanyCandidate`` are verbatim A§4."""
+"""Pure domain models (no I/O)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from enum import StrEnum
 
 
 class JobStatus(StrEnum):
-    """Job lifecycle states (A§2.3): queued → running → success | failed | cancelled."""
+    """Job lifecycle states: queued → running → success | failed | cancelled."""
 
     QUEUED = "queued"
     RUNNING = "running"
@@ -45,7 +45,7 @@ class CompanyCandidate:
 
 @dataclass(slots=True, frozen=True)
 class GeoArea:
-    """Resolved region (A§3.2 ``GeoArea``: id, level, name, bbox; polygon not kept in v0.3, Q13)."""
+    """Resolved region."""
 
     id: str                                    # "iso:DE-BY" | "gn:<geonameId>" | "osm:r<relationId>"
     country_code: str
@@ -54,13 +54,13 @@ class GeoArea:
     input: str = ""                            # label exactly as sent by the client
     method: str = "exact"                      # exact | alias | fuzzy | nominatim | country
     code: str | None = None                    # ISO 3166-2 code, when the area has one
-    osm_relation_id: int | None = None         # Overpass `area(id:3600000000+rel)` (A§4)
+    osm_relation_id: int | None = None         # Overpass `area(id:3600000000+rel)`
     bbox: tuple[float, float, float, float] | None = None   # (south, west, north, east)
 
 
 @dataclass(slots=True, frozen=True)
 class IndustryProfile:
-    """Resolved industry (A§3.2 ``IndustryProfile``). Every mapping records scheme + version."""
+    """Resolved industry."""
 
     id: str
     input: str                                 # label exactly as sent by the client
@@ -70,13 +70,13 @@ class IndustryProfile:
     keywords: dict[str, tuple[str, ...]] = field(default_factory=dict)   # language -> keywords
     negative_keywords: tuple[str, ...] = ()
     osm_tags: tuple[tuple[str, str], ...] = ()  # OSM filter hints, e.g. (("man_made", "works"),)
-    method: str = "catalog"                    # catalog | alias | fuzzy (v0.3, Q8)
+    method: str = "catalog"                    # catalog | alias | fuzzy
     reviewed: bool = True
 
 
 @dataclass(slots=True)
 class EmailFinding:
-    """One email found on a website, kept per job with provenance (A§3.7 ``company_emails``)."""
+    """One email found on a website, kept per job with provenance."""
 
     email: str
     source_url: str
@@ -86,12 +86,12 @@ class EmailFinding:
 
 @dataclass(slots=True)
 class CompanyRecord:
-    """A company assembled during one job (never stored across jobs, C7)."""
+    """A company assembled during one job."""
 
     name: str
     source: str
     source_ref: str
-    country_label: str                         # echo labels (A§2.3)
+    country_label: str                         # echo labels
     region_label: str
     industry_label: str
     area_id: str = ""
@@ -110,4 +110,4 @@ class CompanyRecord:
     emails: list[EmailFinding] = field(default_factory=list)
     company_email: str | None = None
     marketing_objection: bool = False
-    region_confidence: str = "high"            # "low" -> excluded by default (A§3.8)
+    region_confidence: str = "high"            # "low" -> excluded by default

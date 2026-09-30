@@ -55,14 +55,14 @@ def test_us_tier_c(builder: ProfileBuilder) -> None:
 def test_fr_tier_a_but_register_not_listed(builder: ProfileBuilder) -> None:
     p = builder.get("fr")
     assert p.code == "FR" and p.tier == "A"
-    assert p.sources == ["osm"]                                  # Q8: register adapter not enabled
+    assert p.sources == ["osm"]                                  # register adapter not enabled
     assert any(pat.fullmatch("75008") for pat in p.postal_patterns)
 
 
 def test_sources_follow_enabled_adapters() -> None:
     p = build_country_profile("FR", PAGES.keywords,
                               enabled_sources=("osm", "google_places", "fr_recherche_entreprises"))
-    assert p.sources == ["google_places", "osm", "fr_recherche_entreprises"]   # A§3.2 order
+    assert p.sources == ["google_places", "osm", "fr_recherche_entreprises"]
     assert build_country_profile("US", PAGES.keywords).sources == ["osm"]
 
 

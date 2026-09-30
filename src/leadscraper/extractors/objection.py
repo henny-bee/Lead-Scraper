@@ -1,8 +1,4 @@
-"""Marketing-objection flag (ARCHITECTURE.md §3.6 "Advertising objection"; A§2.1
-``exclude_marketing_objections``). Patterns per language live in
-``config/i18n/objection_patterns.yaml``; all languages are checked because many sites carry the
-statement in another language than the country's. Pure, no I/O except reading the YAML once.
-"""
+"""Marketing-objection flag."""
 
 from __future__ import annotations
 

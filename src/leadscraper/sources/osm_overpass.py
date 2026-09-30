@@ -1,22 +1,4 @@
-"""OpenStreetMap / Overpass discovery adapter (ARCHITECTURE.md §4, §3.4 "Discover", §10.4).
-
-Politeness towards the public instance (A§1, A§4; Supervisor note T11):
-- at most ``OVERPASS_MAX_CONCURRENCY`` (=1) request in flight per process and aiolimiter pacing
-  (``OVERPASS_MAX_REQUESTS_PER_MINUTE``), shared through one :class:`OverpassGate` per process;
-- an in-process daily cap (``daily_budget``, Q2) and a per-job request budget (:class:`SourceBudget`,
-  ``OVERPASS_REQUEST_BUDGET_PER_JOB``) — every HTTP attempt counts and increments
-  ``source_budget_used{source="osm"}``;
-- 429/502/503/504/timeouts are retried with exponential backoff (tenacity); after that, or on an
-  Overpass ``runtime error`` (e.g. query timeout), the slice is marked exhausted with a warning and
-  the job continues. No quadtree ``sweep()`` in v0.3 (Q13).
-- Output is bounded by the fixed cap ``OVERPASS_MAX_ELEMENTS_PER_QUERY`` (not the slice quota);
-  a response reaching the cap is reported as ``saturated`` (``tiles_saturated_total``).
-- ``User-Agent`` = ``CRAWLER_USER_AGENT``. No API key is read.
-
-Query shape follows the A§4 example. Keywords are regex-escaped; keywords shorter than
-``OVERPASS_SUBSTRING_MIN_LEN`` must match a whole word (``werk`` ≠ Handwerk/Werkstatt) and the
-profile's negative keywords become a ``name!~`` filter plus a local name filter.
-"""
+"""OpenStreetMap / Overpass discovery adapter."""
 
 from __future__ import annotations
 
@@ -26,21 +8,25 @@ import re
 from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from aiolimiter import AsyncLimiter
-from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import AsyncRetrying, RetryCallState, retry_if_exception_type, stop_after_attempt
 
 from leadscraper import constants as C
 from leadscraper.domain.models import CompanyCandidate, GeoArea, IndustryProfile, SearchSlice
 from leadscraper.observability import metrics
 from leadscraper.observability.logging import get_logger
+from leadscraper.services.region_check import AreaGazetteer, normalise_place, normalise_postcode
 from leadscraper.services.resolver.industry import keywords_for
+from leadscraper.settings import Settings
 
 log = get_logger(__name__)
 
 SOURCE_NAME = "osm"
-OSM_AREA_OFFSET = 3_600_000_000              # area id = 3600000000 + relation id (A§4)
+DEFAULT_OVERPASS_URL: str = Settings.model_fields["overpass_url"].default   # the public instance
+OSM_AREA_OFFSET = 3_600_000_000              # area id = 3600000000 + relation id
 RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
 _REGEX_SPECIAL = re.compile(r"([\\.^$|?*+()\[\]{}])")
 _WORD_BOUNDARY_L = "(^|[^[:alnum:]])"
@@ -54,7 +40,7 @@ def ql_string(value: str) -> str:
 
 
 def regex_escape(keyword: str) -> str:
-    """Escape POSIX-ERE metacharacters (the result still goes through :func:`ql_string`)."""
+    """Escape POSIX-ERE metacharacters (the result still goes through:func:`ql_string`)."""
     return _REGEX_SPECIAL.sub(r"\\\1", keyword)
 
 
@@ -80,7 +66,7 @@ def area_selector(area: GeoArea) -> str:
 
 
 def slice_keywords(industry: IndustryProfile, languages: Sequence[str]) -> list[str]:
-    """Local keywords of the country's languages (A§4: "industry keywords in the local language")."""
+    """Local keywords of the country's languages."""
     return [w for words in keywords_for(industry, languages).values() for w in words]
 
 
@@ -88,15 +74,7 @@ def build_query(area: GeoArea, industry: IndustryProfile, languages: Sequence[st
                 limit: int | None = None, word_boundaries: bool = True,
                 require_name: bool = True, named_set: bool = True,
                 timeout_s: int = C.OVERPASS_QUERY_TIMEOUT_S) -> str:
-    """Overpass QL for one slice, shaped like the A§4 ``Nordrhein-Westfalen × Produktion`` example.
-
-    ``named_set`` (default, T25 live diagnosis): first collect the named elements of the area
-    (``nwr(area.region)["name"]->.named``) and apply the name regex / tag filters to that set.
-    Semantically identical to the A§4 form, but Overpass then evaluates the regex only on the
-    area's elements instead of scanning every distinct ``name`` value worldwide. Measured against
-    overpass-api.de for Bremen × Logistik: A§4 form → ``runtime error: Query timed out … after
-    183 seconds``; named-set form → 50 elements in 12.6 s.
-    """
+    """Overpass QL for one slice, shaped like the ``Nordrhein-Westfalen × Produktion`` example."""
     named = '["name"]' if require_name else ""
     lines = [f"[out:json][timeout:{timeout_s}];", area_selector(area)]
     if named_set:
@@ -111,10 +89,35 @@ def build_query(area: GeoArea, industry: IndustryProfile, languages: Sequence[st
         neg = f'["name"!~"{ql_string(negative)}",i]' if negative else ""
         lines.append(f'  {scope}["name"~"{ql_string(pattern)}",i]{neg}{suffix};')
     for key, value in industry.osm_tags:
-        lines.append(f'  {scope}["{ql_string(key)}"="{ql_string(value)}"]{named}{suffix};')
+        test = f'["{ql_string(key)}"]' if value == "*" else f'["{ql_string(key)}"="{ql_string(value)}"]'
+        lines.append(f'  {scope}{test}{named}{suffix};')
     lines.append(");")
     lines.append(f"out tags center {limit};" if limit else "out tags center;")
     return "\n".join(lines)
+
+
+def build_gazetteer_query(area: GeoArea, *, timeout_s: int = C.OVERPASS_QUERY_TIMEOUT_S) -> str:
+    """The area's postcode boundaries and place nodes, tags only."""
+    types = "|".join(C.GAZETTEER_PLACE_TYPES)
+    return "\n".join([f"[out:json][timeout:{timeout_s}];", area_selector(area), "(",
+                      '  rel["boundary"="postal_code"](area.region);',
+                      f'  node["place"~"^({types})$"](area.region);', ");", "out tags;"])
+
+
+def parse_gazetteer(data: dict[str, Any]) -> AreaGazetteer:
+    """``postal_code`` tags of postcode boundaries (``;``/``,`` lists split) and the normalised
+    ``name`` tags of place nodes."""
+    postcodes: set[str] = set()
+    places: set[str] = set()
+    for el in data.get("elements") or []:
+        tags = el.get("tags") or {}
+        if el.get("type") == "relation" and tags.get("boundary") == "postal_code":
+            postcodes.update(normalise_postcode(c) for c in re.split(r"[;,]", tags.get("postal_code") or "")
+                             if c.strip())
+        elif tags.get("place") in C.GAZETTEER_PLACE_TYPES and (name := tags.get("name")):
+            if place := normalise_place(name):
+                places.add(place)
+    return AreaGazetteer(frozenset(postcodes), frozenset(places))
 
 
 # --- element mapping (pure) ---------------------------------------------------------------------
@@ -140,6 +143,16 @@ def element_to_candidate(el: dict[str, Any]) -> CompanyCandidate | None:
         postal_code=(tags.get("addr:postcode") or "").strip() or None,
         lat=float(lat) if lat is not None else None, lon=float(lon) if lon is not None else None,
         coords_storable=True, hints=hints)
+
+
+def candidate_tier(tags: dict[str, str]) -> int:
+    """Website-first ordering: 0 = has a ``website``/``contact:website`` tag, 1 = has only an
+    ``email``/``contact:email`` tag, 2 = neither (blank values do not count)."""
+    if any((tags.get(k) or "").strip() for k in ("website", "contact:website")):
+        return 0
+    if any((tags.get(k) or "").strip() for k in ("email", "contact:email")):
+        return 1
+    return 2
 
 
 def is_excluded(name: str, negative_keywords: Iterable[str]) -> bool:
@@ -169,11 +182,12 @@ class SourceBudget:
 
 
 class OverpassGate:
-    """Process-wide politeness: 1 request in flight, paced, daily cap (A§4 public limits)."""
+    """Politeness for one endpoint: ≤ ``concurrency`` requests in flight, paced, daily cap."""
 
     def __init__(self, *, concurrency: int = C.OVERPASS_MAX_CONCURRENCY,
                  per_minute: float = C.OVERPASS_MAX_REQUESTS_PER_MINUTE,
                  daily_budget: int | None = C.OVERPASS_DAILY_BUDGET) -> None:
+        self.concurrency = concurrency
         self.semaphore = asyncio.Semaphore(concurrency)
         self.limiter = AsyncLimiter(1, 60 / per_minute)          # evenly spaced, no bursts
         self.daily_budget = daily_budget
@@ -192,15 +206,81 @@ class OverpassGate:
         return True
 
 
+def overpass_endpoints(overpass_url: str) -> tuple[str, ...]:
+    """The public default URL gets the mirrors as failover endpoints; any other (self-hosted) URL
+    stays alone, so its queries never leak to third parties."""
+    if overpass_url == DEFAULT_OVERPASS_URL:
+        return tuple(dict.fromkeys((overpass_url, *C.OVERPASS_MIRROR_URLS)))
+    return (overpass_url,)
+
+
+class OverpassGatePool:
+    """Process-wide Overpass politeness: one:class:`OverpassGate` per endpoint URL, each with the
+    unchanged limits."""
+
+    def __init__(self, endpoints: Sequence[str], *, gates: dict[str, OverpassGate] | None = None,
+                 **gate_kwargs: Any) -> None:
+        self.endpoints: tuple[str, ...] = tuple(dict.fromkeys(endpoints))
+        if not self.endpoints:
+            raise ValueError("an Overpass gate pool needs at least one endpoint")
+        self._gate_kwargs = gate_kwargs
+        self.gates: dict[str, OverpassGate] = dict(gates or {})
+        for url in self.endpoints:
+            self.gate(url)
+
+    @classmethod
+    def for_settings(cls, settings: Settings, **gate_kwargs: Any) -> OverpassGatePool:
+        """The pool for ``OVERPASS_URL`` (+ mirrors only for the public default)."""
+        return cls(overpass_endpoints(settings.overpass_url), **gate_kwargs)
+
+    @classmethod
+    def of(cls, gate: OverpassGate | OverpassGatePool, overpass_url: str) -> OverpassGatePool:
+        """A plain:class:`OverpassGate` is treated as a single-endpoint pool."""
+        if isinstance(gate, OverpassGatePool):
+            return gate
+        return cls((overpass_url,), gates={overpass_url: gate})
+
+    def gate(self, url: str) -> OverpassGate:
+        if url not in self.gates:
+            self.gates[url] = OverpassGate(**self._gate_kwargs)
+        return self.gates[url]
+
+    def endpoints_for(self, overpass_url: str) -> tuple[str, ...]:
+        """This pool's endpoints (primary first) if it was built for ``overpass_url``, else that URL
+        alone."""
+        return self.endpoints if self.endpoints[0] == overpass_url else (overpass_url,)
+
+    @property
+    def concurrency(self) -> int:
+        """Σ endpoint concurrency."""
+        return sum(self.gate(url).concurrency for url in self.endpoints)
+
+
+def _host(url: str) -> str:
+    return urlsplit(url).hostname or url
+
+
+def _is_runtime_error(data: dict[str, Any]) -> bool:
+    return "runtime error" in str(data.get("remark") or "").lower()
+
+
+def _n_elements(data: dict[str, Any] | None) -> int:
+    return len((data or {}).get("elements") or [])
+
+
 # --- adapter ------------------------------------------------------------------------------------
 class _Retryable(Exception):
     pass
 
 
+class _Unavailable(Exception):
+    """A terminal, non-retryable failure of one endpoint; the message names the host."""
+
+
 def _describe(exc: BaseException) -> str:
-    """Short, data-free reason for warnings/logs, e.g. ``http 429`` or ``HTTPStatusError 400``."""
-    if isinstance(exc, _Retryable):
-        return str(exc)                                  # "http 504" / "timeout"
+    """Short, data-free reason for warnings/logs, e.g."""
+    if isinstance(exc, (_Retryable, _Unavailable)):
+        return str(exc)                    # "http 504 at <host>" / "timeout at <host>" / "ConnectError at <host>"
     if isinstance(exc, httpx.HTTPStatusError):
         return f"HTTPStatusError {exc.response.status_code}"
     return type(exc).__name__
@@ -224,7 +304,7 @@ class OverpassAdapter:
 
     overpass_url: str
     user_agent: str
-    gate: OverpassGate
+    gate: OverpassGate | OverpassGatePool             # a plain gate = single-endpoint pool
     budget: SourceBudget
     areas: dict[str, GeoArea]
     industries: dict[str, IndustryProfile]
@@ -238,10 +318,20 @@ class OverpassAdapter:
     countries: frozenset[str] | None = None
     outcomes: dict[SearchSlice, SliceOutcome] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    endpoints: tuple[str, ...] = ()                   # () = from the gate pool (primary first)
+    pool: OverpassGatePool = field(init=False, repr=False)
+    _gazetteers: dict[str, AreaGazetteer | None] = field(default_factory=dict, init=False, repr=False)
+    _gazetteer_locks: dict[str, asyncio.Lock] = field(default_factory=dict, init=False, repr=False)
+    _gazetteer_warned: bool = field(default=False, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.pool = OverpassGatePool.of(self.gate, self.overpass_url)
+        if not self.endpoints:
+            self.endpoints = self.pool.endpoints_for(self.overpass_url)
 
     @property
     def daily_budget(self) -> int | None:
-        return self.gate.daily_budget
+        return self.pool.gate(self.endpoints[0]).daily_budget
 
     async def discover(self, slice_: SearchSlice) -> AsyncIterator[CompanyCandidate]:
         outcome = self.outcomes.setdefault(slice_, SliceOutcome())
@@ -249,22 +339,22 @@ class OverpassAdapter:
         industry = self.industries[slice_.industry_profile_id]
         query = build_query(area, industry, self.languages, limit=self.max_elements)
         try:
-            data = await self._post(query, outcome)
+            data, endpoint = await self._post(query, outcome)
         except _BudgetExhausted as exc:
             self._exhaust(slice_, outcome, str(exc),
                           f"Overpass request budget exhausted for slice {slice_.region_label} × "
                           f"{slice_.industry_label}; results may be fewer than max_output.")
             return
-        except (_Retryable, httpx.HTTPError, ValueError) as exc:
+        except (_Retryable, _Unavailable, httpx.HTTPError, ValueError) as exc:
             self._exhaust(slice_, outcome, "error",
                           f"Overpass unavailable for slice {slice_.region_label} × "
                           f"{slice_.industry_label} ({_describe(exc)}); slice skipped.")
             return
-        remark = str(data.get("remark") or "")
-        if "runtime error" in remark.lower():
+        if _is_runtime_error(data):
             self._exhaust(slice_, outcome, "runtime_error",
                           f"Overpass query for slice {slice_.region_label} × "
-                          f"{slice_.industry_label} failed/timed out on the server; slice skipped.")
+                          f"{slice_.industry_label} failed/timed out on the server "
+                          f"({_host(endpoint)}); slice skipped.")
             # partial elements (if any) are still usable
         elements = data.get("elements") or []
         if len(elements) >= self.max_elements:        # truncated at the cap, not exhausted
@@ -274,7 +364,8 @@ class OverpassAdapter:
                           f"{slice_.industry_label} truncated at {self.max_elements} elements; "
                           f"some candidates may be missed (no tiling in v0.3).")
         seen: set[str] = set()
-        for el in elements:
+        # candidates with a website first, then email-only, then the rest (stable sort)
+        for el in sorted(elements, key=lambda e: candidate_tier(e.get("tags") or {})):
             cand = element_to_candidate(el)
             if cand is None or cand.source_ref in seen:
                 continue
@@ -284,8 +375,37 @@ class OverpassAdapter:
             outcome.candidates += 1
             metrics.CANDIDATES_DISCOVERED.labels(country=slice_.country_code, source=self.name).inc()
             yield cand
-        outcome.exhausted = True                  # one query per slice in v0.3 (no sweep, Q13)
+        outcome.exhausted = True                  # one query per slice in v0.3
         outcome.reason = outcome.reason or "done"
+
+    async def gazetteer(self, area: GeoArea) -> AreaGazetteer | None:
+        """The area gazetteer, queried lazily and at most once per area and job through the gate
+        pool (counts toward the job budget)."""
+        if area.level == "country":
+            return None
+        async with self._gazetteer_locks.setdefault(area.id, asyncio.Lock()):
+            if area.id not in self._gazetteers:
+                self._gazetteers[area.id] = await self._fetch_gazetteer(area)
+            return self._gazetteers[area.id]
+
+    async def _fetch_gazetteer(self, area: GeoArea) -> AreaGazetteer | None:
+        outcome = SliceOutcome()
+        try:
+            data, endpoint = await self._post(build_gazetteer_query(area), outcome)
+        except _BudgetExhausted as exc:
+            reason = "request budget exhausted" if str(exc) == "budget" else "daily budget exhausted"
+        except (_Retryable, _Unavailable, httpx.HTTPError, ValueError) as exc:
+            reason = _describe(exc)
+        else:
+            if not _is_runtime_error(data):
+                return parse_gazetteer(data)
+            reason = f"runtime error at {_host(endpoint)}"
+        log.warning("overpass_gazetteer_unavailable", area=area.id, reason=reason)
+        if not self._gazetteer_warned:
+            self._gazetteer_warned = True
+            self.warnings.append(f"Overpass area gazetteer unavailable ({reason}); the region check "
+                                 "for non-OSM candidates uses OSM postcodes and area names only.")
+        return None
 
     def _exhaust(self, slice_: SearchSlice, outcome: SliceOutcome, reason: str, warning: str) -> None:
         outcome.exhausted, outcome.reason = True, reason
@@ -294,42 +414,75 @@ class OverpassAdapter:
         log.warning("overpass_slice_exhausted", reason=reason, area=slice_.area_id,
                     industry=slice_.industry_profile_id, detail=warning)
 
-    async def _post(self, query: str, outcome: SliceOutcome) -> dict[str, Any]:
+    def _failover_wait(self, state: RetryCallState) -> float:
+        """No wait while an untried endpoint remains; afterwards the v0.3 exponential backoff,
+        counted from the attempt that tried the last endpoint (identical for one endpoint)."""
+        k = state.attempt_number - len(self.endpoints) + 1
+        if k <= 0:
+            return 0.0
+        return min(self.retry_wait_s * 2 ** (k - 1), self.retry_wait_max_s)
+
+    async def _post(self, query: str, outcome: SliceOutcome) -> tuple[dict[str, Any], str]:
+        """One slice query: ``(data, endpoint)``. ≤ ``retry_attempts`` HTTP requests in total;
+        attempt *n* goes to ``endpoints[(n - 1) % len(endpoints)]``."""
         client = self.client or httpx.AsyncClient(timeout=C.OVERPASS_HTTP_TIMEOUT_S)
+        best: tuple[dict[str, Any], str] | None = None           # best runtime-error partial
         try:
             async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(self.retry_attempts),
-                wait=wait_exponential(multiplier=self.retry_wait_s, max=self.retry_wait_max_s),
+                stop=stop_after_attempt(self.retry_attempts), wait=self._failover_wait,
                 retry=retry_if_exception_type(_Retryable), reraise=True,
             ):
                 with attempt:
-                    return await self._request(client, query, outcome)
+                    number = attempt.retry_state.attempt_number
+                    url = self.endpoints[(number - 1) % len(self.endpoints)]
+                    untried_left = number < len(self.endpoints) and number < self.retry_attempts
+                    try:
+                        data = await self._request(client, url, query, outcome)
+                    except httpx.TransportError as exc:          # refused/DNS: fail over, no retry
+                        reason = f"{type(exc).__name__} at {_host(url)}"
+                        if untried_left:
+                            raise _Retryable(reason) from exc
+                        raise _Unavailable(reason) from exc
+                    if not _is_runtime_error(data):
+                        return data, url
+                    if best is None or _n_elements(data) > _n_elements(best[0]):
+                        best = (data, url)
+                    if untried_left:
+                        raise _Retryable(f"runtime error at {_host(url)}")
+                    return best
+        except (_Retryable, _Unavailable, _BudgetExhausted, httpx.HTTPError, ValueError):
+            if best is not None:                          # any terminal failure after a partial:
+                return best                               # partial elements are still usable
+            raise
         finally:
             if self.client is None:
                 await client.aclose()
         raise _Retryable("unreachable")  # pragma: no cover
 
-    async def _request(self, client: httpx.AsyncClient, query: str,
+    async def _request(self, client: httpx.AsyncClient, url: str, query: str,
                        outcome: SliceOutcome) -> dict[str, Any]:
+        gate = self.pool.gate(url)
         if self.budget.exhausted:
             raise _BudgetExhausted("budget")
-        if not self.gate.take_daily():
+        if not gate.take_daily():
             raise _BudgetExhausted("daily_budget")
         self.budget.consume()
         outcome.requests += 1
-        async with self.gate.semaphore:
-            self.gate.in_flight += 1
-            self.gate.max_in_flight = max(self.gate.max_in_flight, self.gate.in_flight)
+        timeout: float | httpx.Timeout = C.OVERPASS_HTTP_TIMEOUT_S           # > [timeout:N]
+        if url != self.endpoints[0]:                 # mirrors: fail fast when they do not answer
+            timeout = httpx.Timeout(C.OVERPASS_HTTP_TIMEOUT_S, connect=C.OVERPASS_MIRROR_CONNECT_TIMEOUT_S)
+        async with gate.semaphore:
+            gate.in_flight += 1
+            gate.max_in_flight = max(gate.max_in_flight, gate.in_flight)
             try:
-                async with self.gate.limiter:
-                    resp = await client.post(self.overpass_url, data={"data": query},
-                                             headers={"User-Agent": self.user_agent},
-                                             timeout=C.OVERPASS_HTTP_TIMEOUT_S)  # > [timeout:N]
+                async with gate.limiter:
+                    resp = await client.post(url, data={"data": query},
+                                             headers={"User-Agent": self.user_agent}, timeout=timeout)
             except httpx.TimeoutException as exc:
-                raise _Retryable("timeout") from exc
+                raise _Retryable(f"timeout at {_host(url)}") from exc
             finally:
-                self.gate.in_flight -= 1
+                gate.in_flight -= 1
         if resp.status_code in RETRYABLE_STATUS:
-            raise _Retryable(f"http {resp.status_code}")
+            raise _Retryable(f"http {resp.status_code} at {_host(url)}")
         resp.raise_for_status()
         return resp.json()

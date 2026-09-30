@@ -1,15 +1,4 @@
-"""Deduplication (ARCHITECTURE.md §3.4 "Dedup", §3.8) with the §3.5 overlap rules.
-
-- Primary key: registered domain of the website (``www.shop.firma-example.de`` and ``firma-example.de/impressum``
-  → ``firma-example.de``), via tldextract's bundled PSL snapshot (``suffix_list_urls=()``, no network).
-- Fallback: normalised name (lowercase, no accents, legal forms of the country removed) + postal
-  code, RapidFuzz ``token_set_ratio ≥ DEDUP_NAME_THRESHOLD`` (92). Without a postal code on both
-  sides no name-merge happens (conservative, C13).
-- A company found by several slices appears once: industry of the most specific ISIC profile,
-  region of the smallest area; ties → the slice that found it first (A§3.5).
-
-State lives in one :class:`Deduplicator` per job (no cross-job data, C7).
-"""
+"""Deduplication with the overlap rules."""
 
 from __future__ import annotations
 
@@ -120,6 +109,28 @@ class Deduplicator:
         self._merge(existing, cand, domain)
         self._index(existing, ref)
         return DedupResult(existing, new=False, reassigned=reassigned)
+
+    def known_domain(self, domain: str | None) -> bool:
+        """Step 6a: the registered domain belongs to an entry already (the OSM data wins)."""
+        return bool(domain) and domain in self._by_domain
+
+    def match_name(self, name: str, postal_code: str | None, *, source: str | None = None,
+                   area_id: str | None = None) -> DedupEntry | None:
+        """Step 6b: the name rule (normalised name without legal forms, ``token_set_ratio ≥
+        threshold``, the same postcode required) for a name found after the crawl, restricted to
+        entries of ``source`` in ``area_id``."""
+        postal = normalize_postal(postal_code)
+        norm_name = normalize_name(name, self.forms)
+        if not postal or not norm_name:
+            return None
+        for other in self._by_postal.get(postal, []):
+            if source is not None and other.candidate.source != source:
+                continue
+            if area_id is not None and other.slice.area_id != area_id:
+                continue
+            if fuzz.token_set_ratio(norm_name, other.norm_name) >= self.threshold:
+                return other
+        return None
 
     def _match_name(self, name: str, postal: str | None, domain: str | None) -> DedupEntry | None:
         if not postal or not name:

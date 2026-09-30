@@ -1,13 +1,4 @@
-"""``POST /verify`` and ``GET /verify/{job_id}`` (ARCHITECTURE.md §2.4, §2.5 table, §5).
-
-- ≤ ``VERIFY_SYNC_LIMIT`` (50) addresses → processed synchronously, ``200``.
-- 51 … ``VERIFY_BATCH_LIMIT`` (10 000) → in-memory ``vrf_`` job, ``202`` + ``poll_url``.
-- more → ``422`` (schema validation).
-- ``smtp_check: true`` with SMTP disabled → DNS-level ``unknown`` / ``smtp_disabled`` + warning (Q9).
-  Sync requests make one SMTP attempt; async jobs retry greylisting with backoff (Q9).
-- Verify jobs follow the scrape-job rules: TTL / failed-TTL / max runtime (sweeper), idempotency
-  while in RAM, and the T28 retention rule (reading never deletes).
-"""
+"""``POST /verify`` and ``GET /verify/{job_id}``."""
 
 from __future__ import annotations
 
@@ -54,7 +45,7 @@ async def verify(req: VerifyRequest, request: Request) -> JSONResponse:
     settings: Settings = request.app.state.settings
     warnings = _warnings(settings, req)
     if len(req.emails) <= C.VERIFY_SYNC_LIMIT:
-        verifier = request.app.state.verifier_factory(settings)   # per-request caches only (C7)
+        verifier = request.app.state.verifier_factory(settings)   # per-request caches only
         results = await verifier.verify_many(req.emails, smtp_check=req.smtp_check,
                                              retry_greylist=False)
         return JSONResponse(_final_body(_dump(results), warnings))
@@ -86,7 +77,7 @@ async def get_verify_job(job_id: str, request: Request) -> dict[str, Any]:
     if job is None or job.kind != "verify":
         raise not_found("Verify job", job_id)
     if job.status is JobStatus.SUCCESS:
-        return _final_body(list(job.result or []), list(job.warnings), job.job_id)  # T28: no delete
+        return _final_body(list(job.result or []), list(job.warnings), job.job_id)  # no delete
     if job.status is JobStatus.FAILED:
         return {"status": "failed", "job_id": job.job_id, "error": job.error}
     if job.status is JobStatus.CANCELLED:

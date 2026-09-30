@@ -1,10 +1,4 @@
-"""Full request resolution → the ``resolved`` block (ARCHITECTURE.md §2.2, §3.2, §3.4 "Resolve").
-
-Unknown/ambiguous input raises :class:`ResolutionError` (mapped to the A§2.3 ``422`` envelope with
-codes ``unresolved_country`` / ``unresolved_region`` / ``unresolved_industry``). Fuzzy corrections,
-tier notes and possibly unavailable ``information`` fields become warnings. No network is used
-unless ``NOMINATIM_URL`` is set (Q7).
-"""
+"""Full request resolution → the ``resolved`` block."""
 
 from __future__ import annotations
 
@@ -26,10 +20,14 @@ from leadscraper.services.resolver.industry import IndustryCatalog, default_cata
 from leadscraper.services.resolver.profile import EU_EEA, OPEN_REGISTERS, CountryProfile, ProfileBuilder
 from leadscraper.settings import Settings
 
+#: The profile used when the request has no industries (``industries`` is optional).
+ANY_INDUSTRY = IndustryProfile(id=C.ANY_INDUSTRY_ID, input="", isic=(),
+                               osm_tags=C.ANY_INDUSTRY_OSM_TAGS, method="any")
+
 LEGAL_FORMS_FILE = C.CONFIG_DIR / "i18n" / "legal_forms.yaml"
 
 TIER_C_WARNING = ("Tier C: business websites are not required to publish a legal notice, so the email yield "
-                  "is expected to be lower.")                                      # A§2.2 example
+                  "is expected to be lower.")
 TIER_A_REGISTER_WARNING = ("Tier A: the open company register '{adapter}' is available for {cc}, "
                            "but its adapter is not enabled in this deployment; discovery uses "
                            "{sources}.")
@@ -38,7 +36,7 @@ NOMINATIM_HINT = ("City/district-level regions require NOMINATIM_URL (not set); 
 
 
 class ResolutionError(Exception):
-    """Input that cannot be resolved confidently → ``422`` (never guessed, C13)."""
+    """Input that cannot be resolved confidently → ``422``."""
 
     def __init__(self, code: str, message: str, details: dict[str, Any]) -> None:
         super().__init__(message)
@@ -59,7 +57,7 @@ class ResolvedRequest:
         return self.profile.code
 
     def to_block(self, known_in_job: int = 0) -> dict[str, Any]:
-        """The A§2.2 ``resolved`` object (no ``known_in_db``; ``known_in_job`` per Q24)."""
+        """The ``resolved`` object."""
         langs = self.profile.languages
         return {
             "country": {"input": self.country.input, "code": self.profile.code,
@@ -82,7 +80,7 @@ class ResolvedRequest:
 
 
 def compliance_note(profile: CountryProfile) -> str:
-    """Override YAML ``compliance_note`` (seeded DE/FR/GB), else a generic note (T10 note)."""
+    """Override YAML ``compliance_note`` (seeded DE/FR/GB), else a generic note."""
     note = profile.overrides.get("compliance_note")
     if note:
         return str(note)
@@ -118,7 +116,10 @@ class Resolver:
                  catalog: IndustryCatalog | None = None, aliases: geo.Aliases | None = None,
                  nominatim: geo.NominatimClient | None = None) -> None:
         self.settings = settings
-        self.profiles = profiles or ProfileBuilder()
+        # profile.sources lists only enabled sources (web_search unless WEB_SEARCH_URL=off);
+        # imported here: the registry imports the adapters, which import resolver modules
+        from leadscraper.sources.registry import enabled_source_names  # noqa: PLC0415
+        self.profiles = profiles or ProfileBuilder(enabled_sources=enabled_source_names(settings))
         self.catalog = catalog or default_catalog()
         self.aliases = aliases if aliases is not None else geo.default_aliases()
         if nominatim is None and settings.nominatim_url:
@@ -155,6 +156,10 @@ class Resolver:
             regions.append(geo.country_area(cc))
 
         industries: list[IndustryProfile] = []
+        if not req.industries:
+            industries.append(ANY_INDUSTRY)
+            warnings.append("No industries given: all companies in the area are searched (OSM "
+                            "office/craft/industrial entries); web-search discovery is skipped.")
         for text in req.industries:
             res = self.catalog.resolve(text, profile.languages)
             metrics.RESOLVER_RESULTS.labels(field="industry", method=res.method or "failed").inc()

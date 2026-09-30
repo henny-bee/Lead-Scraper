@@ -1,6 +1,4 @@
-"""Opt-in live smoke test against the public Overpass instance (A§10.4). Skipped by default:
-pytest runs with `-m "not live"` (pyproject addopts); run it explicitly with `pytest -m live`.
-It sends exactly one small, paced query with the default User-Agent."""
+"""Opt-in live smoke test against the public Overpass instance."""
 
 import httpx
 import pytest
