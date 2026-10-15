@@ -1,5 +1,8 @@
 # Company Lead Scraper API
 
+
+<img width="2201" height="962" alt="image" src="https://github.com/user-attachments/assets/6ee3379d-d43a-42c5-a6a2-c7c1bde9b142" />
+
 Send it a target (country, regions, optional industries, fields you want, max results). It returns
 companies with their website and email. The country, region and industry values are free text in
 any language and are interpreted when the request arrives.
